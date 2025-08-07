@@ -41,28 +41,25 @@ desenhaMenu imgs opcaoSel =
 -- | Desenha todas as torres com o seu alcance
 desenhaTorres :: ImmutableTowers -> Picture
 desenhaTorres e =
-  Pictures $
-    concatMap
-      ( \torre ->
-          [ desenhaAlcanceTorre torre,
-            desenhaTorre e torre
-          ]
-      )
-      (torresJogo (jogo e))
+  Pictures $ concatMap (\torre -> [desenhaAlcanceTorre (mapaJogo (jogo e)) torre, desenhaTorre e torre]) (torresJogo (jogo e))
 
 desenhaTorre :: ImmutableTowers -> Torre -> Picture
 desenhaTorre e torre =
-  let (x, y) = posicaoTorre torre
+  let bloco = calculaTamanhoBloco (mapaJogo (jogo e))
+      (x, y) = posicaoTorre torre
       img = case projetilTorre torre of
         Projetil Resina _ -> TorreResina
         Projetil Gelo _ -> TorreGelo
         Projetil Fogo _ -> TorreFogo
-   in Translate (converteX (realToFrac x)) (converteY (realToFrac y)) (scale 0.6 0.6 (getImagem img (imagens e)))
+      escala = escalaImagem bloco 500 -- 500x500 torre
+      posX = converteX (realToFrac x)
+      posY = converteY (realToFrac y)
+   in Translate posX posY (Scale escala escala (getImagem img (imagens e)))
 
-desenhaAlcanceTorre :: Torre -> Picture
-desenhaAlcanceTorre torre =
+desenhaAlcanceTorre :: Mapa -> Torre -> Picture
+desenhaAlcanceTorre mapa torre =
   let (x, y) = posicaoTorre torre
-      raio = alcanceTorre torre * calculaTamanhoBloco mapa01
+      raio = alcanceTorre torre * calculaTamanhoBloco mapa
    in Color (withAlpha 0.3 blue) $ Translate (converteX (realToFrac x)) (converteY (realToFrac y)) $ Circle raio
 
 -- | Desenha todos os inimigos
@@ -72,30 +69,36 @@ desenhaInimigos e =
 
 desenhaInimigo :: ImmutableTowers -> Inimigo -> Picture
 desenhaInimigo e inimigo =
-  let (x, y) = posicaoInimigo inimigo
-   in Translate
-        (converteX (realToFrac x))
-        (converteY (realToFrac y))
-        (scale 0.3 0.3 (getImagem Inimigocima (imagens e)))
+  let bloco = calculaTamanhoBloco (mapaJogo (jogo e))
+      (x, y) = posicaoInimigo inimigo
+      escala = escalaImagem bloco 500 -- 500x500 inimigo
+   in Translate (converteX (realToFrac x)) (converteY (realToFrac y)) (Scale escala escala (getImagem Inimigocima (imagens e)))
 
--- | Desenha o portal
 desenhaPortal :: ImmutableTowers -> Portal -> Picture
 desenhaPortal e portal =
-  let (x, y) = posicaoPortal portal
-   in Translate (converteX (realToFrac x)) (converteY (realToFrac y)) (scale 0.6 0.6 (getImagem PortalFoto (imagens e)))
+  let bloco = calculaTamanhoBloco (mapaJogo (jogo e))
+      (x, y) = posicaoPortal portal
+      escala = escalaImagem bloco 500 -- 500x500 portal
+   in Translate (converteX (realToFrac x)) (converteY (realToFrac y)) (Scale escala escala (getImagem PortalFoto (imagens e)))
 
--- | Desenha a base
 desenhaBase :: ImmutableTowers -> Base -> Picture
 desenhaBase e base =
-  let (x, y) = posicaoBase base
-   in Translate (converteX (realToFrac x)) (converteY (realToFrac y)) (scale 0.3 0.3 (getImagem BaseFoto (imagens e)))
+  let bloco = calculaTamanhoBloco (mapaJogo (jogo e))
+      (x, y) = posicaoBase base
+      escalaX = escalaImagem bloco 471 -- base largura
+      escalaY = escalaImagem bloco 530 -- base altura
+   in Translate (converteX (realToFrac x)) (converteY (realToFrac y)) (Scale escalaX escalaY (getImagem BaseFoto (imagens e)))
 
--- | Converte um bloco de terreno em imagem
 blocoToPicture :: Imagens -> Terreno -> Picture
-blocoToPicture imgs t = case t of
-  Relva -> getImagem Grass imgs
-  Agua -> getImagem Water imgs
-  Terra -> getImagem Land imgs
+blocoToPicture imgs t =
+  let bloco = calculaTamanhoBloco mapa01
+      (img, w, h) = case t of
+        Relva -> (Grass, 225, 225)
+        Agua -> (Water, 1366, 768)
+        Terra -> (Land, 980, 980)
+      escalaX = escalaImagem bloco w
+      escalaY = escalaImagem bloco h
+   in Scale escalaX escalaY (getImagem img imgs)
 
 -- | Desenha o mapa completo
 mapaToPicture :: Imagens -> Mapa -> Picture
@@ -103,15 +106,15 @@ mapaToPicture imgs terreno =
   let bloco = calculaTamanhoBloco terreno
       largura = fromIntegral (length (head terreno))
       altura = fromIntegral (length terreno)
-      meioX = largura / 2
-      meioY = altura / 2
+      offsetX = -(largura * bloco) / 2
+      offsetY = -(altura * bloco) / 2
    in Pictures
-        [ Translate (x' * bloco + bloco / 2) (y' * bloco + bloco / 2) $
-            blocoToPicture imgs b
-          | (y, linha) <- zip [0 ..] (reverse terreno),
-            (x, b) <- zip [0 ..] linha,
-            let x' = x - meioX,
-            let y' = y - meioY
+        [ Translate
+            (offsetX + fromIntegral x * bloco + bloco / 2)
+            (offsetY + fromIntegral y * bloco + bloco / 2)
+            $ blocoToPicture imgs b
+          | (y, linha) <- zip [0 ..] (reverse terreno), -- invertendo linhas
+            (x, b) <- zip [0 ..] linha
         ]
 
 -- | Calcula o tamanho de cada bloco
@@ -169,3 +172,8 @@ carregarImagens = do
               ]
           }
   return $ ImmutableTowers jogoInicial imgs (MenuInicial Jogar) 0 Nothing
+
+escalaImagem :: Float -> Float -> Float
+escalaImagem bloco tamanhoOriginal = bloco / tamanhoOriginal
+
+

@@ -2,7 +2,7 @@ module Tempo where
 
 import ImmutableTowers
 import LI12425
-import Tarefa3 (atualizaJogo)
+import Tarefa3 
 
 reageTempo :: Tempo -> ImmutableTowers -> IO ImmutableTowers
 reageTempo segundos estado@(ImmutableTowers jogo imgs EmJogo tempoAtual torreSel) =
