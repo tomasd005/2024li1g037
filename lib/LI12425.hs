@@ -1,26 +1,45 @@
-{-|
-Module      : LI12425
-Description : Definições base do jogo
-Copyright   : Nelson Estevão <d12733@di.uminho.pt>
-              Olga Pacheco   <omp@di.uminho.pt>
-              Pedro Peixoto  <d14110@di.uminho.pt>
-              Xavier Pinho   <d12736@di.uminho.pt>
+-- |
+-- Module      : LI12425
+-- Description : Definições base do jogo
+-- Copyright   : Nelson Estevão <d12733@di.uminho.pt>
+--               Olga Pacheco   <omp@di.uminho.pt>
+--               Pedro Peixoto  <d14110@di.uminho.pt>
+--               Xavier Pinho   <d12736@di.uminho.pt>
+--
+-- Tipos de dados e funções auxiliares para a realização do projeto de LI1 em 2024/25.
+module LI12425
+  ( -- * Tipos de dados
 
-Tipos de dados e funções auxiliares para a realização do projeto de LI1 em 2024/25.
--}
-module LI12425 (
-    -- * Tipos de dados
     -- ** Básicos
-    Creditos, Direcao(..), Distancia, Duracao(..), Posicao, Semente, Tempo,
+    Creditos,
+    Direcao (..),
+    Distancia,
+    Duracao (..),
+    Posicao,
+    Semente,
+    Tempo,
+
     -- ** Mapas
-    Mapa, Terreno(..),
+    Mapa,
+    Terreno (..),
+
     -- ** Entidades
-    Base(..), Torre(..), Portal(..), Inimigo(..), TipoProjetil(..), Projetil(..),
+    Base (..),
+    Torre (..),
+    Portal (..),
+    Inimigo (..),
+    TipoProjetil (..),
+    Projetil (..),
+
     -- ** Jogo
-    Jogo(..), Onda(..), Loja,
+    Jogo (..),
+    Onda (..),
+    Loja,
+
     -- * Funções auxiliares
-    geraAleatorios
-    ) where
+    geraAleatorios,
+  )
+where
 
 import System.Random (mkStdGen, randoms)
 
@@ -173,15 +192,14 @@ data Jogo = Jogo
 -- | Valor inicial que determina a sequência de números pseudo-aleatórios.
 type Semente = Int
 
-{-| Função que gera uma lista de números aleatórios a partir de uma 'Semente'.
-
-== Exemplos
-
->>> geraAleatorios 2425 3
-[9108974057934916489,3509742222561512871,1534041518507426227]
-
->>> geraAleatorios 10 1
-[3575835729477015470]
--}
+-- | Função que gera uma lista de números aleatórios a partir de uma 'Semente'.
+--
+-- == Exemplos
+--
+-- >>> geraAleatorios 2425 3
+-- [9108974057934916489,3509742222561512871,1534041518507426227]
+--
+-- >>> geraAleatorios 10 1
+-- [3575835729477015470]
 geraAleatorios :: Semente -> Int -> [Int]
 geraAleatorios s c = take c $ randoms (mkStdGen s)
