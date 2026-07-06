@@ -63,6 +63,17 @@ getImagem k d = case lookup k d of
   Just (Just img) -> img
   _ -> Blank
 
+-- | Igual a 'getImagem', mas desenha um marcador visível quando um asset
+-- essencial não foi carregado. Útil para descobrir imagens em falta sem deixar
+-- elementos importantes invisíveis durante o desenvolvimento.
+getImagemOuFallback :: Imagem -> Imagens -> Picture
+getImagemOuFallback k d = case lookup k d of
+  Just (Just img) -> img
+  _ -> Pictures
+        [ Color (withAlpha 0.35 red) $ rectangleSolid 32 32
+        , Color red $ rectangleWire 32 32
+        ]
+
 -- | O mapa principal do jogo, definido como uma matriz de terrenos.
 --
 -- Cada célula pode ser 'Relva', 'Terra' ou 'Agua'. Este mapa define o cenário e caminhos disponíveis para inimigos e posicionamento de torres.

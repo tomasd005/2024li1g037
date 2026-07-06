@@ -8,6 +8,22 @@ Pode compilar e executar o programa através dos comandos `build` e `run` do Cab
 cabal run --verbose=0
 ```
 
+### Windows / GHCup
+
+Se ao executar aparecer o erro `unknown GLUT entry glutInit`, falta o DLL do
+FreeGLUT no `PATH`. Instale a dependência pelo MSYS2 do GHCup:
+
+```bash
+/c/ghcup/msys64/usr/bin/pacman.exe -Sy --noconfirm mingw-w64-x86_64-freeglut
+```
+
+Depois execute com o script que adiciona o FreeGLUT ao `PATH` só para este
+comando:
+
+```bash
+bash scripts/run-windows.sh
+```
+
 ## Interpretador
 
 Para abrir o interpretador do Haskell (GHCi) com o projeto carregado, utilize o comando `repl` do Cabal

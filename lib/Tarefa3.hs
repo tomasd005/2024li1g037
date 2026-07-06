@@ -44,19 +44,28 @@ atualizaJogo tempo jogo =
       (torresAtualizadas, inimigosAposDisparo) =
         atualizaTodasTorres tempo todosInimigos (torresJogo jogo)
       
-      -- 3. Mover inimigos e aplicar efeitos
+      -- 3. Remover inimigos que já chegaram à base antes de os mover.
+      -- Sem esta separação, um inimigo que começa o ciclo em cima da base pode
+      -- mover-se para fora dela antes de causar dano.
+      (inimigosMortosAntesMovimento, inimigosParaMover, inimigosNaBaseAntesMovimento) =
+        separaInimigosPorEstado inimigosAposDisparo (posicaoBase (baseJogo jogo))
+
+      -- 4. Mover inimigos restantes e aplicar efeitos
       inimigosMovidos =
-        map (atualizaInimigo tempo (mapaJogo jogo)) inimigosAposDisparo
+        map (atualizaInimigo tempo (mapaJogo jogo)) inimigosParaMover
       
-      -- 4. Separar inimigos mortos, vivos e que chegaram à base
-      (inimigosMortos, inimigosVivos, inimigosNaBase) =
+      -- 5. Separar inimigos mortos, vivos e que chegaram à base depois de mover
+      (inimigosMortosDepoisMovimento, inimigosVivos, inimigosNaBaseDepoisMovimento) =
         separaInimigosPorEstado inimigosMovidos (posicaoBase (baseJogo jogo))
       
-      -- 5. Calcular butim e dano
+      inimigosMortos = inimigosMortosAntesMovimento ++ inimigosMortosDepoisMovimento
+      inimigosNaBase = inimigosNaBaseAntesMovimento ++ inimigosNaBaseDepoisMovimento
+
+      -- 6. Calcular butim e dano
       butimGanho = sum (map butimInimigo inimigosMortos)
       danoSofrido = sum (map ataqueInimigo inimigosNaBase)
       
-      -- 6. Atualizar base
+      -- 7. Atualizar base
       baseAtualizada = (baseJogo jogo) {
         creditosBase = max 0 (creditosBase (baseJogo jogo) + butimGanho),
         vidaBase = max 0 (vidaBase (baseJogo jogo) - danoSofrido)

@@ -215,7 +215,8 @@ removeEfeito tipo inimigo@Inimigo {projeteisInimigo = projeteis} =
   let projeteisAtualizados = filter (\p -> tipoProjetil p /= tipo) projeteis
    in inimigo {projeteisInimigo = projeteisAtualizados}
 
--- | A função 'atualizarProjetis' lida com as sinergias entre os projéteis de uma torre e os projéteis já presentes no inimigo.
+-- | A função 'atualizarProjetis' adiciona um novo projétil ao fim da lista de
+-- projéteis ativos do inimigo, preservando os efeitos já existentes.
 --
 -- == Exemplo:
 --
@@ -233,13 +234,13 @@ removeEfeito tipo inimigo@Inimigo {projeteisInimigo = projeteis} =
 -- [Projetil {tipoProjetil = Gelo, duracaoProjetil = Finita 2.0}, Projetil {tipoProjetil = Resina, duracaoProjetil = Finita 4.0}]
 --
 -- >>> atualizarProjetis (Projetil {tipoProjetil = Fogo, duracaoProjetil = Finita 3.0}) [Projetil {tipoProjetil = Fogo, duracaoProjetil = Finita 2.0}]
--- [Projetil {tipoProjetil = Fogo, duracaoProjetil = Finita 5.0}]
+-- [Projetil {tipoProjetil = Fogo, duracaoProjetil = Finita 2.0},Projetil {tipoProjetil = Fogo, duracaoProjetil = Finita 3.0}]
 atualizarProjetis :: Projetil -> [Projetil] -> [Projetil]
 atualizarProjetis projetilNovo projeteis =
-  let todosProjetis = projetilNovo : projeteis
-      semFogoEGelo = fogoEGelo todosProjetis
-      comFogoEResina = atingeFogoEResina semFogoEGelo
-   in somaProjetil comFogoEResina
+  let projeteisCompatíveis = case tipoProjetil projetilNovo of
+        Fogo -> filter (\p -> tipoProjetil p /= Resina) projeteis
+        _ -> projeteis
+   in projeteisCompatíveis ++ [projetilNovo]
 
 -- | A função terminouJogo decide se o jogo terminou, ou seja, se o jogador ganhou ou perdeu o jogo.
 --

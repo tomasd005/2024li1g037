@@ -33,7 +33,7 @@ main = do
 
 -- | A constante @janela@ define o tipo de exibição da janela do jogo.
 janela :: Display
-janela = FullScreen
+janela = InWindow "Immutable Towers" (round larguraJanela, round alturaJanela) (100, 50)
 
 -- | A constante @corFundo@ define a cor de fundo da janela do jogo.
 corFundo :: Color

@@ -1,19 +1,36 @@
 module Desenhar where
 
-import GHC.Float
+import GHC.Float (double2Float)
 import Graphics.Gloss
 import Graphics.Gloss.Juicy
 import ImmutableTowers
 import LI12425
-import Tarefa1 (terrenoPorPosicao)  -- ADICIONAR ESTA IMPORTAÇÃO
 import Tarefa2 (inimigosNoAlcance)
+
+-- Paleta mais sóbria, inspirada em tower defenses com tabuleiro tático:
+-- terreno escuro, água dessaturada, UI em painéis translúcidos.
+mapaLarguraMax, mapaAlturaMax, mapaCentroY :: Float
+mapaLarguraMax = 900
+mapaAlturaMax = 760
+mapaCentroY = 20
+
+corFundoJogo, corPainel, corTextoSuave :: Color
+corFundoJogo = makeColorI 13 17 15 255
+corPainel = makeColorI 24 31 26 225
+corTextoSuave = makeColorI 220 226 214 255
+
+corRelvaBase, corRelvaAlt, corTerraBase, corAguaBase :: Color
+corRelvaBase = makeColorI 62 86 49 255
+corRelvaAlt = makeColorI 72 98 58 255
+corTerraBase = makeColorI 86 65 43 255
+corAguaBase = makeColorI 58 103 122 255
 
 -- ============================================================================
 -- FUNÇÃO PRINCIPAL DE DESENHO
 -- ============================================================================
 
 desenha :: ImmutableTowers -> IO Picture
-desenha e@(ImmutableTowers jogo imgs modo _ _) = case modo of
+desenha e@(ImmutableTowers _ imgs modo _ _) = case modo of
   MenuInicial opcao -> return $ desenhaMenu imgs opcao
   Pausado -> return $ desenhaPausado
   EmJogo -> return $ desenhaJogoCompleto e
@@ -27,6 +44,7 @@ desenha e@(ImmutableTowers jogo imgs modo _ _) = case modo of
 desenhaJogoCompleto :: ImmutableTowers -> Picture
 desenhaJogoCompleto e =
   Pictures [
+    Color corFundoJogo $ rectangleSolid larguraJanela alturaJanela,
     -- Camadas de baixo para cima
     mapaToPicture (imagens e) (mapaJogo (jogo e)),
     desenhaTorres e,
@@ -48,12 +66,12 @@ desenhaInstrucoes :: ImmutableTowers -> Picture
 desenhaInstrucoes e =
   case torreSelecionada e of
     Nothing -> 
-      Translate (-larguraJanela/2 + 200) (alturaJanela/2 - 150) $
-      Scale 0.15 0.15 $ Color white $ 
+      Translate (-larguraJanela/2 + 44) (alturaJanela/2 - 128) $
+      Scale 0.12 0.12 $ Color corTextoSuave $ 
       Text "Clique nas torres abaixo para comprar"
     Just _ ->
-      Translate (-larguraJanela/2 + 200) (alturaJanela/2 - 150) $
-      Scale 0.15 0.15 $ Color yellow $ 
+      Translate (-larguraJanela/2 + 44) (alturaJanela/2 - 128) $
+      Scale 0.12 0.12 $ Color (makeColorI 235 194 96 255) $ 
       Text "Clique na RELVA para colocar (Botao direito cancela)"
 
 -- ============================================================================
@@ -64,17 +82,18 @@ desenhaMenu :: Imagens -> MenuInicialOpcoes -> Picture
 desenhaMenu imgs opcaoSel =
   Pictures [
     getImagem Fundo imgs,
-    botao Play (-400) opcaoSel Jogar,
+    Translate (-260) 180 $ Scale 0.45 0.45 $ Color white $ Text "IMMUTABLE TOWERS",
+    botao Play (-300) opcaoSel Jogar,
     botao ButaoCreditos 0 opcaoSel Creditos,
-    botao Exit 400 opcaoSel Sair,
+    botao Exit 300 opcaoSel Sair,
     -- Instruções
-    Translate 0 800 $ Scale 0.2 0.2 $ Color white $ Text "Use SETAS ou CLIQUE nos botoes"
+    Translate (-260) (-380) $ Scale 0.15 0.15 $ Color white $ Text "Use SETAS ou CLIQUE nos botoes"
   ]
   where
     botao img x sel alvo =
       let selecionado = sel == alvo
           escala = if selecionado then 0.35 else 0.25
-          y = if selecionado then -800 else -850
+          y = if selecionado then -160 else -190
           cor = if selecionado then yellow else white
           corFundo = if selecionado 
                      then makeColor 1 1 0 0.3  -- Amarelo translúcido
@@ -126,14 +145,34 @@ desenhaTorreSprite :: ImmutableTowers -> Torre -> Picture
 desenhaTorreSprite e torre =
   let bloco = calculaTamanhoBloco (mapaJogo (jogo e))
       (x, y) = posicaoTorre torre
-      img = case projetilTorre torre of
-        Projetil Resina _ -> TorreResina
-        Projetil Gelo _ -> TorreGelo
-        Projetil Fogo _ -> TorreFogo
-      escala = escalaImagem bloco 500
       posX = converteX (realToFrac x)
       posY = converteY (realToFrac y)
-   in Translate posX posY $ Scale escala escala $ getImagem img (imagens e)
+   in Translate posX posY $ modeloTorre bloco (projetilTorre torre) False
+
+modeloTorre :: Float -> Projetil -> Bool -> Picture
+modeloTorre bloco projetil selecionada =
+  let corpo = makeColorI 83 88 84 255
+      sombra = makeColorI 20 24 22 170
+      metalClaro = makeColorI 178 184 176 255
+      acento = case tipoProjetil projetil of
+        Resina -> makeColorI 145 107 61 255
+        Gelo -> makeColorI 111 150 168 255
+        Fogo -> makeColorI 175 88 58 255
+      escala = bloco / 28
+      aro = if selecionada
+            then Color (makeColorI 226 194 95 255) $ rectangleWire (bloco * 0.92) (bloco * 0.92)
+            else Blank
+   in Pictures [
+        Color sombra $ Translate 2 (-3) $ ThickCircle (bloco * 0.18) (bloco * 0.38),
+        aro,
+        Scale escala escala $ Pictures [
+          Color corpo $ rectangleSolid 13 20,
+          Color metalClaro $ Translate 0 10 $ rectangleSolid 18 5,
+          Color metalClaro $ Translate 0 (-10) $ rectangleSolid 18 5,
+          Color acento $ Translate 0 0 $ rectangleSolid 5 18,
+          Color (withAlpha 0.35 black) $ Translate 5 0 $ rectangleSolid 3 18
+        ]
+      ]
 
 -- Barra de cooldown acima da torre
 desenhaCooldownTorre :: Torre -> Picture
@@ -168,11 +207,24 @@ desenhaInimigoSprite :: ImmutableTowers -> Inimigo -> Picture
 desenhaInimigoSprite e inimigo =
   let bloco = calculaTamanhoBloco (mapaJogo (jogo e))
       (x, y) = posicaoInimigo inimigo
-      escala = escalaImagem bloco 500
       posX = converteX (realToFrac x)
       posY = converteY (realToFrac y)
-   in Translate posX posY $ Scale escala escala $ 
-        getImagem Inimigocima (imagens e)
+   in Translate posX posY $ modeloInimigo bloco
+
+modeloInimigo :: Float -> Picture
+modeloInimigo bloco =
+  let pele = makeColorI 114 86 70 255
+      contorno = makeColorI 39 31 29 255
+      olho = makeColorI 222 198 118 255
+      escala = bloco / 24
+   in Scale escala escala $ Pictures [
+        Color (withAlpha 0.35 black) $ Translate 2 (-3) $ circleSolid 10,
+        Color contorno $ circleSolid 10,
+        Color pele $ circleSolid 8,
+        Color olho $ Translate (-3) 2 $ circleSolid 1.6,
+        Color olho $ Translate 3 2 $ circleSolid 1.6,
+        Color contorno $ Translate 0 (-3) $ rectangleSolid 8 2
+      ]
 
 -- Efeitos visuais de projéteis ativos
 desenhaEfeitosInimigo :: ImmutableTowers -> Inimigo -> Picture
@@ -271,11 +323,17 @@ desenhaPortal :: ImmutableTowers -> Portal -> Picture
 desenhaPortal e portal =
   let bloco = calculaTamanhoBloco (mapaJogo (jogo e))
       (x, y) = posicaoPortal portal
-      escala = escalaImagem bloco 500
       posX = converteX (realToFrac x)
       posY = converteY (realToFrac y)
-   in Translate posX posY $ Scale escala escala $ 
-        getImagem PortalFoto (imagens e)
+   in Translate posX posY $ modeloPortal bloco
+
+modeloPortal :: Float -> Picture
+modeloPortal bloco =
+  Pictures [
+    Color (makeColorI 38 34 50 255) $ ThickCircle (bloco * 0.22) (bloco * 0.22),
+    Color (withAlpha 0.75 (makeColorI 91 76 130 255)) $ circleSolid (bloco * 0.25),
+    Color (withAlpha 0.55 (makeColorI 170 132 210 255)) $ circleSolid (bloco * 0.12)
+  ]
 
 -- ============================================================================
 -- DESENHO DA BASE
@@ -285,12 +343,22 @@ desenhaBase :: ImmutableTowers -> Base -> Picture
 desenhaBase e base =
   let bloco = calculaTamanhoBloco (mapaJogo (jogo e))
       (x, y) = posicaoBase base
-      escalaX = escalaImagem bloco 471
-      escalaY = escalaImagem bloco 530
       posX = converteX (realToFrac x)
       posY = converteY (realToFrac y)
-   in Translate posX posY $ Scale escalaX escalaY $ 
-        getImagem BaseFoto (imagens e)
+   in Translate posX posY $ modeloBase bloco
+
+modeloBase :: Float -> Picture
+modeloBase bloco =
+  let pedra = makeColorI 110 113 105 255
+      luz = makeColorI 173 177 166 255
+      telhado = makeColorI 83 72 61 255
+   in Pictures [
+        Color (withAlpha 0.35 black) $ Translate 2 (-3) $ rectangleSolid (bloco * 0.8) (bloco * 0.72),
+        Color pedra $ rectangleSolid (bloco * 0.72) (bloco * 0.62),
+        Color luz $ Translate 0 (bloco * 0.18) $ rectangleSolid (bloco * 0.58) (bloco * 0.12),
+        Color telhado $ Translate 0 (bloco * 0.36) $ Polygon [(-bloco*0.44,0),(0,bloco*0.22),(bloco*0.44,0)],
+        Color (withAlpha 0.28 black) $ rectangleWire (bloco * 0.74) (bloco * 0.64)
+      ]
 
 -- ============================================================================
 -- HUD (HEADS-UP DISPLAY)
@@ -301,39 +369,22 @@ desenhaHUD e =
   let base = baseJogo (jogo e)
       vida = floor (vidaBase base) :: Int
       creditos = creditosBase base
-      
-      -- Painel semi-transparente
-      painel = Color (withAlpha 0.7 black) $
-                 Translate 0 (alturaJanela/2 - 60) $
-                 rectangleSolid larguraJanela 100
-      
-      -- Vida
-      textoVida = Translate (-larguraJanela/2 + 100) (alturaJanela/2 - 50) $
-                    Pictures [
-                      Color white $ Scale 0.2 0.2 $ Text "Vida:",
-                      Translate 150 0 $ Color red $ Scale 0.25 0.25 $ 
-                        Text (show vida)
-                    ]
-      
-      -- Créditos
-      textoCreditos = Translate (-larguraJanela/2 + 100) (alturaJanela/2 - 90) $
-                        Pictures [
-                          Color white $ Scale 0.2 0.2 $ Text "Creditos:",
-                          Translate 150 0 $ Color yellow $ Scale 0.25 0.25 $ 
-                            Text (show creditos)
-                        ]
-      
-      -- Ondas restantes
       totalOndas = sum $ map (length . inimigosOnda) $ concatMap ondasPortal $ portaisJogo (jogo e)
       inimigosAtivos = length (inimigosJogo (jogo e))
-      textoInimigos = Translate (larguraJanela/2 - 300) (alturaJanela/2 - 70) $
-                        Pictures [
-                          Color white $ Scale 0.2 0.2 $ Text "Inimigos:",
-                          Translate 200 0 $ Color orange $ Scale 0.25 0.25 $
-                            Text (show inimigosAtivos ++ " / " ++ show totalOndas)
-                        ]
-   
-   in Pictures [painel, textoVida, textoCreditos, textoInimigos]
+      y = alturaJanela/2 - 46
+      painel = Color corPainel $ Translate 0 y $ rectangleSolid (larguraJanela - 96) 72
+      texto x label valor corValor = Translate x (y - 8) $ Pictures [
+        Color corTextoSuave $ Scale 0.13 0.13 $ Text label,
+        Translate 110 0 $ Color corValor $ Scale 0.17 0.17 $ Text valor
+        ]
+      vidaCor = if vida > 40 then makeColorI 135 174 111 255 else makeColorI 190 82 72 255
+   in Pictures [
+        painel,
+        Color (makeColorI 65 75 61 255) $ Translate 0 y $ rectangleWire (larguraJanela - 96) 72,
+        texto (-larguraJanela/2 + 74) "VIDA" (show vida) vidaCor,
+        texto (-80) "CREDITOS" (show creditos) (makeColorI 226 194 95 255),
+        texto (larguraJanela/2 - 330) "INIMIGOS" (show inimigosAtivos ++ " / " ++ show totalOndas) (makeColorI 226 153 76 255)
+      ]
 
 -- ============================================================================
 -- LOJA (SHOP) - ATUALIZADA
@@ -347,46 +398,34 @@ desenhaLoja e =
    in Pictures $ zipWith (desenhaBotaoLoja bloco torreSel (imagens e)) [0..] loja
 
 desenhaBotaoLoja :: Float -> Maybe Torre -> Imagens -> Int -> (Creditos, Torre) -> Picture
-desenhaBotaoLoja bloco torreSel imgs indice (preco, torre) =
-  let posX = -larguraJanela/2 + 150 + fromIntegral indice * 160
-      posY = -alturaJanela/2 + 100
+desenhaBotaoLoja _ torreSel _ indice (preco, torre) =
+  let posX = -larguraJanela/2 + 118 + fromIntegral indice * 136
+      posY = -alturaJanela/2 + 82
       selecionada = case torreSel of
                       Just t -> tipoProjetil (projetilTorre t) == 
                                 tipoProjetil (projetilTorre torre)
                       Nothing -> False
-      cor = if selecionada then green else white
+      cor = if selecionada then makeColorI 226 194 95 255 else makeColorI 92 103 88 255
       corFundo = if selecionada 
-                 then makeColor 0 0.5 0 0.8
-                 else makeColor 0.2 0.2 0.2 0.8
-      
-      img = case projetilTorre torre of
-        Projetil Resina _ -> TorreResina
-        Projetil Gelo _ -> TorreGelo
-        Projetil Fogo _ -> TorreFogo
-      
-      -- Adiciona informações da torre
+                 then makeColorI 55 60 45 235
+                 else makeColorI 31 39 33 225
+      nome = case tipoProjetil (projetilTorre torre) of
+        Resina -> "RESINA"
+        Gelo -> "GELO"
+        Fogo -> "FOGO"
       textoInfo = if selecionada 
                   then Pictures [
-                    Translate 0 50 $ Scale 0.08 0.08 $ Color white $ 
-                      Text ("Alc: " ++ show (floor $ alcanceTorre torre :: Int)),
-                    Translate 0 35 $ Scale 0.08 0.08 $ Color white $ 
-                      Text ("Dano: " ++ show (floor $ danoTorre torre :: Int))
+                    Translate (-44) 39 $ Scale 0.065 0.065 $ Color corTextoSuave $ Text ("ALC " ++ show (floor $ alcanceTorre torre :: Int)),
+                    Translate (-44) 27 $ Scale 0.065 0.065 $ Color corTextoSuave $ Text ("DMG " ++ show (floor $ danoTorre torre :: Int))
                   ]
                   else Blank
-   
    in Translate posX posY $ Pictures [
-        -- Fundo
-        Color corFundo $ rectangleSolid 140 140,
-        -- Borda (mais grossa se selecionada)
-        Color cor $ 
-          if selecionada 
-          then Pictures [rectangleWire 142 142, rectangleWire 144 144, rectangleWire 146 146]
-          else rectangleWire 142 142,
-        -- Imagem da torre
-        Scale 0.15 0.15 $ getImagem img imgs,
-        -- Preço
-        Translate 0 (-80) $ Scale 0.15 0.15 $ Color yellow $ Text (show preco),
-        -- Informações
+        Color corFundo $ rectangleSolid 116 116,
+        Color cor $ rectangleWire 116 116,
+        if selecionada then Color cor $ rectangleWire 120 120 else Blank,
+        Translate 0 4 $ modeloTorre 56 (projetilTorre torre) selecionada,
+        Translate (-45) (-48) $ Scale 0.075 0.075 $ Color corTextoSuave $ Text nome,
+        Translate 18 (-48) $ Scale 0.085 0.085 $ Color (makeColorI 226 194 95 255) $ Text (show preco),
         textoInfo
       ]
 
@@ -437,71 +476,108 @@ desenhaPausado =
 -- FUNÇÕES AUXILIARES
 -- ============================================================================
 
-blocoToPicture :: Imagens -> Terreno -> Picture
-blocoToPicture imgs t =
-  let bloco = calculaTamanhoBloco mapa01
-      (img, w, h) = case t of
-        Relva -> (Grass, 225, 225)
-        Agua -> (Water, 1366, 768)
-        Terra -> (Land, 980, 980)
-      escalaX = escalaImagem bloco w
-      escalaY = escalaImagem bloco h
-   in Scale escalaX escalaY (getImagem img imgs)
+blocoToPicture :: Terreno -> Int -> Int -> Float -> Picture
+blocoToPicture terreno x y bloco =
+  let variacao = (x * 17 + y * 31) `mod` 5
+      relva = if even (x + y) then corRelvaBase else corRelvaAlt
+      detalheRelva = if variacao == 0
+                     then Color (withAlpha 0.18 (makeColorI 152 168 121 255)) $
+                          rectangleSolid (bloco * 0.34) (bloco * 0.34)
+                     else Blank
+      grelha = Color (withAlpha 0.16 black) $ rectangleWire bloco bloco
+   in case terreno of
+        Relva -> Pictures [
+          Color relva $ rectangleSolid bloco bloco,
+          detalheRelva,
+          grelha
+          ]
+        Terra -> Pictures [
+          Color corTerraBase $ rectangleSolid bloco bloco,
+          Color (withAlpha 0.2 black) $ rectangleWire bloco bloco,
+          Color (withAlpha 0.12 (makeColorI 142 111 74 255)) $ rectangleSolid (bloco * 0.72) (bloco * 0.72)
+          ]
+        Agua -> Pictures [
+          Color corAguaBase $ rectangleSolid bloco bloco,
+          Color (withAlpha 0.22 (makeColorI 141 177 188 255)) $ rectangleSolid (bloco * 0.72) (bloco * 0.72),
+          Color (withAlpha 0.18 black) $ rectangleWire bloco bloco
+          ]
 
 mapaToPicture :: Imagens -> Mapa -> Picture
-mapaToPicture imgs terreno =
+mapaToPicture _ terreno =
   let bloco = calculaTamanhoBloco terreno
       largura = fromIntegral (length (head terreno))
       altura = fromIntegral (length terreno)
-      offsetX = -(largura * bloco) / 2
-      offsetY = -(altura * bloco) / 2
+      offsetX = offsetMapaX terreno
+      offsetY = offsetMapaY terreno
+      margem = 14
    in Pictures [
-        Translate
-          (offsetX + fromIntegral x * bloco + bloco / 2)
-          (offsetY + fromIntegral y * bloco + bloco / 2)
-          $ blocoToPicture imgs b
-        | (y, linha) <- zip [0..] (reverse terreno),
-          (x, b) <- zip [0..] linha
+        Color (makeColorI 20 25 21 255) $
+          Translate 0 mapaCentroY $ rectangleSolid (largura * bloco + margem) (altura * bloco + margem),
+        Color (makeColorI 68 78 63 255) $
+          Translate 0 mapaCentroY $ rectangleWire (largura * bloco + margem) (altura * bloco + margem),
+        Pictures [
+          Translate
+            (offsetX + fromIntegral x * bloco + bloco / 2)
+            (offsetY + fromIntegral y * bloco + bloco / 2)
+            $ blocoToPicture b x y bloco
+          | (y, linha) <- zip [0 :: Int ..] (reverse terreno),
+            (x, b) <- zip [0 :: Int ..] linha
+        ]
       ]
 
 calculaTamanhoBloco :: Mapa -> Float
 calculaTamanhoBloco terreno =
   let largura = fromIntegral (length (head terreno))
       altura = fromIntegral (length terreno)
-   in min (larguraJanela / largura) (alturaJanela / altura)
+   in min (mapaLarguraMax / largura) (mapaAlturaMax / altura)
 
 converteX :: Double -> Float
-converteX x = (-larguraJanela / 2) + (double2Float x * int2Float pixeis)
+converteX x = offsetMapaX mapa01 + (double2Float x * calculaTamanhoBloco mapa01)
 
 converteY :: Double -> Float
-converteY y = (alturaJanela / 2) - (double2Float y * int2Float pixeis)
+converteY y = offsetMapaY mapa01 + (fromIntegral (length mapa01) - double2Float y) * calculaTamanhoBloco mapa01
+
+offsetMapaX :: Mapa -> Float
+offsetMapaX terreno =
+  let bloco = calculaTamanhoBloco terreno
+      largura = fromIntegral (length (head terreno))
+   in -(largura * bloco) / 2
+
+offsetMapaY :: Mapa -> Float
+offsetMapaY terreno =
+  let bloco = calculaTamanhoBloco terreno
+      altura = fromIntegral (length terreno)
+   in mapaCentroY - (altura * bloco) / 2
 
 escalaImagem :: Float -> Float -> Float
 escalaImagem bloco tamanhoOriginal = bloco / tamanhoOriginal
 
 carregarImagens :: IO ImmutableTowers
 carregarImagens = do
-  fundo <- loadJuicy "/home/cliff/Desktop/2024li1g037/app/imagens/fundo_1_.bmp"
-  grass <- loadJuicy "/home/cliff/Desktop/2024li1g037/app/imagens/images.bmp"
-  water <- loadJuicy "/home/cliff/Desktop/2024li1g037/app/imagens/6da00a37f26551f688dcc04367d7c73c_1.bmp"
-  land <- loadJuicy "/home/cliff/Desktop/2024li1g037/app/imagens/terra_textura.bmp"
-  torreResina <- loadJuicy "/home/cliff/Desktop/2024li1g037/app/imagens/DALL_E-2025-01-13-13.52.34-A-simple-gray-tower-designed-for-a-tower-defense-game-removebg-preview.bmp"
-  torreGelo <- loadJuicy "/home/cliff/Desktop/2024li1g037/app/imagens/DALL_E-2025-01-13-13.52.34-A-simple-gray-tower-designed-for-a-tower-defense-game-removebg-preview.bmp"
-  torreFogo <- loadJuicy "/home/cliff/Desktop/2024li1g037/app/imagens/DALL_E-2025-01-13-13.52.34-A-simple-gray-tower-designed-for-a-tower-defense-game-removebg-preview.bmp"
-  inimigo <- loadJuicy "/home/cliff/Desktop/2024li1g037/app/imagens/enemy-clipart-little-monster-holding-a-gun-in-one-hand_546721_wh860_2_-removebg-preview.bmp"
-  base <- loadJuicy "/home/cliff/Desktop/2024li1g037/app/imagens/tower_image-removebg-preview.bmp"
-  portal <- loadJuicy "/home/cliff/Desktop/2024li1g037/app/imagens/portal.bmp"
-  play <- loadJuicy "/home/cliff/Desktop/2024li1g037/app/imagens/play.bmp"
-  exit <- loadJuicy "/home/cliff/Desktop/2024li1g037/app/imagens/exit.bmp"
-  creditos <- loadJuicy "/home/cliff/Desktop/2024li1g037/app/imagens/creditos.bmp"
-  tutorial <- loadJuicy "/home/cliff/Desktop/2024li1g037/app/imagens/tutorial.bmp"
+  fundo <- loadJuicy (caminhoImagem "fundo_1_.bmp")
+  grass <- loadJuicy (caminhoImagem "images.bmp")
+  water <- loadJuicy (caminhoImagem "6da00a37f26551f688dcc04367d7c73c_1.bmp")
+  land <- loadJuicy (caminhoImagem "terra_textura.bmp")
+  torreResina <- loadJuicy (caminhoImagem "DALL_E-2025-01-13-13.52.34-A-simple-gray-tower-designed-for-a-tower-defense-game-removebg-preview.bmp")
+  torreGelo <- loadJuicy (caminhoImagem "DALL_E-2025-01-13-13.52.34-A-simple-gray-tower-designed-for-a-tower-defense-game-removebg-preview.bmp")
+  torreFogo <- loadJuicy (caminhoImagem "DALL_E-2025-01-13-13.52.34-A-simple-gray-tower-designed-for-a-tower-defense-game-removebg-preview.bmp")
+  inimigo <- loadJuicy (caminhoImagem "enemy-clipart-little-monster-holding-a-gun-in-one-hand_546721_wh860_2_-removebg-preview.bmp")
+  base <- loadJuicy (caminhoImagem "tower_image-removebg-preview.bmp")
+  portal <- loadJuicy (caminhoImagem "portal.bmp")
+
+  -- Estes botões eram carregados a partir de ficheiros que não existem no
+  -- repositório. Por agora são desenhados com texto em 'desenhaMenu'.
+  let playImg = Nothing
+      exitImg = Nothing
+      creditosImg = Nothing
+      tutorialImg = Nothing
 
   let imgs = [
         (Fundo, fundo), (Grass, grass), (Water, water), (Land, land),
         (TorreResina, torreResina), (TorreGelo, torreGelo), (TorreFogo, torreFogo),
         (Inimigocima, inimigo), (BaseFoto, base), (PortalFoto, portal),
-        (Play, play), (Exit, exit), (ButaoCreditos, creditos),
-        (ImagemTutorial, tutorial), (ImagemCreditos, creditos)
+        (Play, playImg), (Exit, exitImg), (ButaoCreditos, creditosImg),
+        (ImagemTutorial, tutorialImg), (ImagemCreditos, creditosImg)
         ]
       
       jogoInicial = Jogo {
@@ -518,3 +594,6 @@ carregarImagens = do
       }
   
   return $ ImmutableTowers jogoInicial imgs (MenuInicial Jogar) 0 Nothing
+
+caminhoImagem :: FilePath -> FilePath
+caminhoImagem nome = "app/imagens/" ++ nome

@@ -1,12 +1,16 @@
 module Eventos where
 
 import Data.List
-import GHC.Float (int2Float)
 import Graphics.Gloss.Interface.IO.Game
 import ImmutableTowers
 import LI12425
 import Tarefa1
 import System.Exit (exitSuccess)
+
+mapaLarguraMaxInput, mapaAlturaMaxInput, mapaCentroYInput :: Float
+mapaLarguraMaxInput = 900
+mapaAlturaMaxInput = 760
+mapaCentroYInput = 20
 
 reage :: Event -> ImmutableTowers -> IO ImmutableTowers
 
@@ -32,13 +36,13 @@ reage (EventKey (SpecialKey KeyLeft) Down _ _) e@(ImmutableTowers _ _ modo _ _) 
 
 reage (EventKey (MouseButton LeftButton) Down _ (mx, my)) e@(ImmutableTowers _ _ (MenuInicial _) _ _) = do
   -- Botão Jogar (esquerda)
-  if mx >= -500 && mx <= -300 && my >= -900 && my <= -750
+  if mx >= -450 && mx <= -150 && my >= -260 && my <= -110
     then return e {modo = EmJogo}
-  -- Botão Créditos (centro)
-  else if mx >= -100 && mx <= 100 && my >= -900 && my <= -750
+  -- Botão Créditos/Tutorial (centro)
+  else if mx >= -150 && mx <= 150 && my >= -260 && my <= -110
     then return e {modo = TutorialFoto}
   -- Botão Sair (direita)
-  else if mx >= 300 && mx <= 500 && my >= -900 && my <= -750
+  else if mx >= 150 && mx <= 450 && my >= -260 && my <= -110
     then exitSuccess
   else return e
 
@@ -123,11 +127,13 @@ reage (EventKey (MouseButton LeftButton) Down _ (mx, my)) estado@(ImmutableTower
   let mapa = mapaJogo jogo
       largura = fromIntegral (length (head mapa))
       altura = fromIntegral (length mapa)
-      bloco = min (larguraJanela / largura) (alturaJanela / altura)
+      bloco = min (mapaLarguraMaxInput / largura) (mapaAlturaMaxInput / altura)
+      offsetX = -(largura * bloco) / 2
+      offsetY = mapaCentroYInput - (altura * bloco) / 2
   
   -- Converter coordenadas de tela para coordenadas do mapa
-  let posX = floor $ (mx + (larguraJanela / 2)) / bloco
-      posY = floor $ ((alturaJanela / 2) - my) / bloco
+  let posX = floor ((mx - offsetX) / bloco) :: Int
+      posY = floor (altura - ((my - offsetY) / bloco)) :: Int
       novaPosicao = (fromIntegral posX + 0.5, fromIntegral posY + 0.5)
       
   putStrLn $ "Tentando colocar torre em: " ++ show novaPosicao
@@ -183,10 +189,10 @@ mesmoTipoTorre t1 t2 = tipoProjetil (projetilTorre t1) == tipoProjetil (projetil
 -- | Função auxiliar para detectar cliques na loja (CORRIGIDA)
 lojaClicada :: Float -> Float -> Int -> Bool
 lojaClicada mx my indice =
-  let posX = -larguraJanela/2 + 150 + fromIntegral indice * 160
-      posY = -alturaJanela/2 + 100
-      largura = 140
-      altura = 140
+  let posX = -larguraJanela/2 + 118 + fromIntegral indice * 136
+      posY = -alturaJanela/2 + 82
+      largura = 116
+      altura = 116
    in mx >= (posX - largura/2) && 
       mx <= (posX + largura/2) && 
       my >= (posY - altura/2) && 

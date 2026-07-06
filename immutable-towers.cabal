@@ -26,7 +26,7 @@ library
         Tarefa3
 
     build-depends:
-        base >=4.17 && <4.19,
+        base >=4.17 && <4.21,
         random ^>=1.3
 
     hs-source-dirs:   lib
@@ -44,7 +44,7 @@ executable immutable-towers
     main-is:          Main.hs
 
     build-depends:
-        base >=4.17 && <4.19,
+        base >=4.17 && <4.21,
         random ^>=1.3,
         gloss ^>=1.13.2.1,
         gloss-juicy ^>=0.2.3,
@@ -65,7 +65,7 @@ test-suite immutable-towers-test
     main-is:          Spec.hs
 
     build-depends:
-        base >=4.17 && <4.19,
+        base >=4.17 && <4.21,
         random ^>=1.3,
         HUnit ^>=1.6.2.0,
         gloss ^>=1.13.2.1,
