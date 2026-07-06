@@ -18,13 +18,15 @@ reage :: Event -> ImmutableTowers -> IO ImmutableTowers
 -- MENU PRINCIPAL - Navegação com setas
 -- ============================================================================
 
-reage (EventKey (SpecialKey KeyRight) Down _ _) e@(ImmutableTowers _ _ modo _ _) =
+reage (EventMotion pos) estado = return estado {posicaoRato = Just pos}
+
+reage (EventKey (SpecialKey KeyRight) Down _ _) e@(ImmutableTowers _ _ modo _ _ _) =
   case modo of
     MenuInicial Jogar -> return e {modo = MenuInicial Creditos}
     MenuInicial Creditos -> return e {modo = MenuInicial Sair}
     _ -> return e
 
-reage (EventKey (SpecialKey KeyLeft) Down _ _) e@(ImmutableTowers _ _ modo _ _) =
+reage (EventKey (SpecialKey KeyLeft) Down _ _) e@(ImmutableTowers _ _ modo _ _ _) =
   case modo of
     MenuInicial Creditos -> return e {modo = MenuInicial Jogar}
     MenuInicial Sair -> return e {modo = MenuInicial Creditos}
@@ -34,15 +36,15 @@ reage (EventKey (SpecialKey KeyLeft) Down _ _) e@(ImmutableTowers _ _ modo _ _) 
 -- MENU PRINCIPAL - Navegação com cliques
 -- ============================================================================
 
-reage (EventKey (MouseButton LeftButton) Down _ (mx, my)) e@(ImmutableTowers _ _ (MenuInicial _) _ _) = do
+reage (EventKey (MouseButton LeftButton) Down _ (mx, my)) e@(ImmutableTowers _ _ (MenuInicial _) _ _ _) = do
   -- Botão Jogar (esquerda)
-  if mx >= -450 && mx <= -150 && my >= -260 && my <= -110
+  if mx >= -420 && mx <= -180 && my >= -179 && my <= -61
     then return e {modo = EmJogo}
   -- Botão Créditos/Tutorial (centro)
-  else if mx >= -150 && mx <= 150 && my >= -260 && my <= -110
+  else if mx >= -120 && mx <= 120 && my >= -179 && my <= -61
     then return e {modo = TutorialFoto}
   -- Botão Sair (direita)
-  else if mx >= 150 && mx <= 450 && my >= -260 && my <= -110
+  else if mx >= 180 && mx <= 420 && my >= -179 && my <= -61
     then exitSuccess
   else return e
 
@@ -50,11 +52,12 @@ reage (EventKey (MouseButton LeftButton) Down _ (mx, my)) e@(ImmutableTowers _ _
 -- ENTER para confirmar seleção no menu
 -- ============================================================================
 
-reage (EventKey (SpecialKey KeyEnter) Down _ _) e@(ImmutableTowers _ _ modo _ _) =
+reage (EventKey (SpecialKey KeyEnter) Down _ _) e@(ImmutableTowers _ _ modo _ _ _) =
   case modo of
     MenuInicial Jogar -> return e {modo = EmJogo}
     MenuInicial Sair -> exitSuccess
     MenuInicial Creditos -> return e {modo = TutorialFoto}
+    TutorialFoto -> return e {modo = MenuInicial Creditos}
     MostrarCreditos -> return e {modo = MenuInicial Creditos}
     _ -> return e
 
@@ -62,7 +65,7 @@ reage (EventKey (SpecialKey KeyEnter) Down _ _) e@(ImmutableTowers _ _ modo _ _)
 -- ESC para sair do tutorial ou do jogo
 -- ============================================================================
 
-reage (EventKey (SpecialKey KeyEsc) Down _ _) e@(ImmutableTowers _ _ modo _ _) =
+reage (EventKey (SpecialKey KeyEsc) Down _ _) e@(ImmutableTowers _ _ modo _ _ _) =
   case modo of
     TutorialFoto -> return e {modo = MenuInicial Creditos}
     EmJogo -> 
@@ -81,7 +84,7 @@ reage (EventKey (SpecialKey KeyEsc) Down _ _) e@(ImmutableTowers _ _ modo _ _) =
 -- PAUSAR e RETOMAR jogo
 -- ============================================================================
 
-reage (EventKey (Char 'p') Down _ _) e@(ImmutableTowers _ _ modo _ _) =
+reage (EventKey (Char 'p') Down _ _) e@(ImmutableTowers _ _ modo _ _ _) =
   case modo of
     EmJogo -> return e {modo = Pausado}
     Pausado -> return e {modo = EmJogo}
@@ -91,39 +94,29 @@ reage (EventKey (Char 'p') Down _ _) e@(ImmutableTowers _ _ modo _ _) =
 -- CANCELAR seleção de torre com botão direito
 -- ============================================================================
 
-reage (EventKey (MouseButton RightButton) Down _ _) estado@(ImmutableTowers _ _ EmJogo _ (Just _)) = do
-  putStrLn "Torre desselecionada"
+reage (EventKey (MouseButton RightButton) Down _ _) estado@(ImmutableTowers _ _ EmJogo _ (Just _) _) =
   return estado {torreSelecionada = Nothing}
 
 -- ============================================================================
 -- SELECIONAR torre na loja (sem torre selecionada)
 -- ============================================================================
 
-reage (EventKey (MouseButton LeftButton) Down _ (mx, my)) estado@(ImmutableTowers jogo _ EmJogo _ Nothing) = do
+reage (EventKey (MouseButton LeftButton) Down _ (mx, my)) estado@(ImmutableTowers jogo _ EmJogo _ Nothing _) = do
   let itensLoja = zip [0 ..] (lojaJogo jogo)
       itemClicado = find (\(i, _) -> lojaClicada mx my i) itensLoja
   
-  putStrLn $ "Clique em: (" ++ show mx ++ ", " ++ show my ++ ")"
-  
   case itemClicado of
-    Just (indice, (preco, torre)) -> do
-      putStrLn $ "Torre selecionada: índice " ++ show indice ++ ", preço " ++ show preco
+    Just (_, (preco, torre)) -> do
       if creditosBase (baseJogo jogo) >= preco
-        then do
-          putStrLn "Créditos suficientes! Torre selecionada."
-          return estado {torreSelecionada = Just torre}
-        else do
-          putStrLn "Créditos insuficientes!"
-          return estado
-    Nothing -> do
-      putStrLn "Clique fora da loja"
-      return estado
+        then return estado {torreSelecionada = Just torre, posicaoRato = Just (mx, my)}
+        else return estado
+    Nothing -> return estado {posicaoRato = Just (mx, my)}
 
 -- ============================================================================
 -- COLOCAR torre no mapa (com torre selecionada)
 -- ============================================================================
 
-reage (EventKey (MouseButton LeftButton) Down _ (mx, my)) estado@(ImmutableTowers jogo _ EmJogo _ (Just torre)) = do
+reage (EventKey (MouseButton LeftButton) Down _ (mx, my)) estado@(ImmutableTowers jogo _ EmJogo _ (Just torre) _) = do
   let mapa = mapaJogo jogo
       largura = fromIntegral (length (head mapa))
       altura = fromIntegral (length mapa)
@@ -136,16 +129,9 @@ reage (EventKey (MouseButton LeftButton) Down _ (mx, my)) estado@(ImmutableTower
       posY = floor (altura - ((my - offsetY) / bloco)) :: Int
       novaPosicao = (fromIntegral posX + 0.5, fromIntegral posY + 0.5)
       
-  putStrLn $ "Tentando colocar torre em: " ++ show novaPosicao
-  putStrLn $ "Coordenadas de tela: (" ++ show mx ++ ", " ++ show my ++ ")"
-  putStrLn $ "Coordenadas do mapa: (" ++ show posX ++ ", " ++ show posY ++ ")"
-  
   -- Verificar se a posição é válida
   let terrenoValido = terrenoPorPosicao (fromIntegral posX, fromIntegral posY) mapa == Just Relva
       posicaoLivre = notElem novaPosicao (map posicaoTorre (torresJogo jogo))
-      
-  putStrLn $ "Terreno válido (Relva): " ++ show terrenoValido
-  putStrLn $ "Posição livre: " ++ show posicaoLivre
   
   if terrenoValido && posicaoLivre
     then do
@@ -153,8 +139,6 @@ reage (EventKey (MouseButton LeftButton) Down _ (mx, my)) estado@(ImmutableTower
       let precoTorre = case find (\(_, t) -> mesmoTipoTorre t torre) (lojaJogo jogo) of
                          Just (preco, _) -> preco
                          Nothing -> 0
-      
-      putStrLn $ "Torre colocada! Preço: " ++ show precoTorre
       
       let novaTorre = torre {posicaoTorre = novaPosicao}
           novasTorres = novaTorre : torresJogo jogo
@@ -166,11 +150,10 @@ reage (EventKey (MouseButton LeftButton) Down _ (mx, my)) estado@(ImmutableTower
           torresJogo = novasTorres,
           baseJogo = novaBase
         },
-        torreSelecionada = Nothing
+        torreSelecionada = Nothing,
+        posicaoRato = Just (mx, my)
       }
-    else do
-      putStrLn "Posição inválida para torre."
-      return estado
+    else return estado {posicaoRato = Just (mx, my)}
 
 -- ============================================================================
 -- CASO PADRÃO

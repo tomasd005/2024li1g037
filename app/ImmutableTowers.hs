@@ -13,7 +13,8 @@ data ImmutableTowers = ImmutableTowers
     imagens :: Imagens,
     modo :: Modo,
     tempo :: Float,
-    torreSelecionada :: Maybe Torre
+    torreSelecionada :: Maybe Torre,
+    posicaoRato :: Maybe (Float, Float)
   }
 
 -- | O tipo @Imagem@ representa os identificadores únicos das imagens utilizadas no jogo.

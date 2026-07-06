@@ -5,7 +5,7 @@ import LI12425
 import Tarefa3
 
 reageTempo :: Tempo -> ImmutableTowers -> IO ImmutableTowers
-reageTempo segundos estado@(ImmutableTowers jogo imgs EmJogo tempoAtual torreSel) =
+reageTempo segundos (ImmutableTowers jogo imgs EmJogo tempoAtual torreSel rato) =
   let segundosFloat = realToFrac segundos
 
       -- Atualiza o jogo inteiro com o tempo decorrido
@@ -13,6 +13,6 @@ reageTempo segundos estado@(ImmutableTowers jogo imgs EmJogo tempoAtual torreSel
 
       -- Tempo acumulado
       tempoNovo = tempoAtual + segundos
-   in return $ ImmutableTowers jogoAtualizado imgs EmJogo tempoNovo torreSel
+   in return $ ImmutableTowers jogoAtualizado imgs EmJogo tempoNovo torreSel rato
 -- Outros modos não alteram o estado
 reageTempo _ estado = return estado
