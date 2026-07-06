@@ -54,6 +54,7 @@ desenhaJogoCompleto e =
     desenhaPortais e,
     desenhaBase e (baseJogo (jogo e)),
     desenhaHUD e,
+    desenhaPainelLateral e,
     desenhaLoja e,
     desenhaGameOver e,
     desenhaInstrucoes e  -- ADICIONADO
@@ -445,6 +446,39 @@ desenhaHUD e =
         texto (larguraJanela/2 - 330) "INIMIGOS" (show inimigosAtivos ++ " / " ++ show totalOndas) (makeColorI 226 153 76 255)
       ]
 
+desenhaPainelLateral :: ImmutableTowers -> Picture
+desenhaPainelLateral e =
+  let base = baseJogo (jogo e)
+      torreSel = torreSelecionada e
+      inimigosAtivos = length (inimigosJogo (jogo e))
+      ondasRestantes = length $ concatMap ondasPortal (portaisJogo (jogo e))
+      x = larguraJanela/2 - 150
+      y = 120
+      linha n texto = Translate (x - 110) (y + 86 - fromIntegral n * 34) $
+        Scale 0.085 0.085 $ Color corTextoSuave $ Text texto
+      titulo = Translate (x - 110) (y + 122) $
+        Scale 0.12 0.12 $ Color (makeColorI 226 194 95 255) $ Text "ESTADO"
+      infoTorre = case torreSel of
+        Nothing -> ["Seleciona uma torre", "na loja para ver", "a pre-visualizacao."]
+        Just torre -> [
+          "Torre: " ++ nomeProjetil (projetilTorre torre),
+          "Alcance: " ++ show (floor $ alcanceTorre torre :: Int),
+          "Dano: " ++ show (floor $ danoTorre torre :: Int),
+          "Direito: cancelar"
+          ]
+      linhas = [
+        "Vida base: " ++ show (floor (vidaBase base) :: Int),
+        "Creditos: " ++ show (creditosBase base),
+        "Inimigos: " ++ show inimigosAtivos,
+        "Ondas: " ++ show ondasRestantes
+        ] ++ [""] ++ infoTorre
+   in Pictures [
+        Color corPainel $ Translate x y $ rectangleSolid 260 330,
+        Color (makeColorI 68 78 63 255) $ Translate x y $ rectangleWire 260 330,
+        titulo,
+        Pictures [linha i texto | (i, texto) <- zip [0 :: Int ..] linhas]
+      ]
+
 -- ============================================================================
 -- LOJA (SHOP) - ATUALIZADA
 -- ============================================================================
@@ -454,24 +488,23 @@ desenhaLoja e =
   let loja = lojaJogo (jogo e)
       bloco = calculaTamanhoBloco (mapaJogo (jogo e))
       torreSel = torreSelecionada e
-   in Pictures $ zipWith (desenhaBotaoLoja bloco torreSel (imagens e)) [0..] loja
+      creditos = creditosBase (baseJogo (jogo e))
+   in Pictures $ zipWith (desenhaBotaoLoja bloco torreSel creditos) [0..] loja
 
-desenhaBotaoLoja :: Float -> Maybe Torre -> Imagens -> Int -> (Creditos, Torre) -> Picture
-desenhaBotaoLoja _ torreSel _ indice (preco, torre) =
+desenhaBotaoLoja :: Float -> Maybe Torre -> Creditos -> Int -> (Creditos, Torre) -> Picture
+desenhaBotaoLoja _ torreSel creditos indice (preco, torre) =
   let posX = -larguraJanela/2 + 118 + fromIntegral indice * 136
       posY = -alturaJanela/2 + 82
+      compravel = creditos >= preco
       selecionada = case torreSel of
                       Just t -> tipoProjetil (projetilTorre t) == 
                                 tipoProjetil (projetilTorre torre)
                       Nothing -> False
-      cor = if selecionada then makeColorI 226 194 95 255 else makeColorI 92 103 88 255
+      cor = if selecionada then makeColorI 226 194 95 255 else if compravel then makeColorI 92 103 88 255 else makeColorI 78 70 66 255
       corFundo = if selecionada 
                  then makeColorI 55 60 45 235
-                 else makeColorI 31 39 33 225
-      nome = case tipoProjetil (projetilTorre torre) of
-        Resina -> "RESINA"
-        Gelo -> "GELO"
-        Fogo -> "FOGO"
+                 else if compravel then makeColorI 31 39 33 225 else makeColorI 28 28 27 215
+      corPreco = if compravel then makeColorI 226 194 95 255 else makeColorI 190 82 72 255
       textoInfo = if selecionada 
                   then Pictures [
                     Translate (-44) 39 $ Scale 0.065 0.065 $ Color corTextoSuave $ Text ("ALC " ++ show (floor $ alcanceTorre torre :: Int)),
@@ -483,10 +516,17 @@ desenhaBotaoLoja _ torreSel _ indice (preco, torre) =
         Color cor $ rectangleWire 116 116,
         if selecionada then Color cor $ rectangleWire 120 120 else Blank,
         Translate 0 4 $ modeloTorre 56 (projetilTorre torre) selecionada,
-        Translate (-45) (-48) $ Scale 0.075 0.075 $ Color corTextoSuave $ Text nome,
-        Translate 18 (-48) $ Scale 0.085 0.085 $ Color (makeColorI 226 194 95 255) $ Text (show preco),
+        if compravel then Blank else Color (withAlpha 0.45 black) $ rectangleSolid 116 116,
+        Translate (-45) (-48) $ Scale 0.075 0.075 $ Color corTextoSuave $ Text (nomeProjetil (projetilTorre torre)),
+        Translate 18 (-48) $ Scale 0.085 0.085 $ Color corPreco $ Text (show preco),
         textoInfo
       ]
+
+nomeProjetil :: Projetil -> String
+nomeProjetil projetil = case tipoProjetil projetil of
+  Resina -> "RESINA"
+  Gelo -> "GELO"
+  Fogo -> "FOGO"
 
 -- ============================================================================
 -- GAME OVER (VITÓRIA/DERROTA)
