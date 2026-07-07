@@ -6,7 +6,6 @@ import Graphics.Gloss
 import Graphics.Gloss.Juicy
 import ImmutableTowers
 import LI12425
-import MapData
 import MapGeometry
 import MetaTypes
 import ProgressionSystem (capituloEstagioTexto)
@@ -328,7 +327,7 @@ desenhaTorreCompleta :: ImmutableTowers -> Torre -> [Picture]
 desenhaTorreCompleta e torre =
   let alcance = desenhaAlcanceTorre (mapaJogo (jogo e)) torre (torreSelecionada e)
       sprite = desenhaTorreSprite e torre
-      cooldown = desenhaCooldownTorre torre
+      cooldown = desenhaCooldownTorre (mapaJogo (jogo e)) torre
       foco = if torreFocada e == Just (posicaoTorre torre)
              then desenhaFocoTorre e torre
              else Blank
@@ -337,21 +336,21 @@ desenhaTorreCompleta e torre =
 desenhaFocoTorre :: ImmutableTowers -> Torre -> Picture
 desenhaFocoTorre e torre =
   let bloco = calculaTamanhoBloco (mapaJogo (jogo e))
-      (x, y) = posicaoTorre torre
+      (posX, posY) = posicaoMapaParaEcra (mapaJogo (jogo e)) (posicaoTorre torre)
    in Color (makeColorI 226 194 95 255) $
-        Translate (converteX (realToFrac x)) (converteY (realToFrac y)) $
+        Translate posX posY $
         ThickCircle (bloco * 0.34) 3
 
 desenhaAlcanceTorre :: Mapa -> Torre -> Maybe Torre -> Picture
 desenhaAlcanceTorre mapa torre torreSel =
-  let (x, y) = posicaoTorre torre
-      raio = alcanceTorre torre * calculaTamanhoBloco mapa
+  let raio = alcanceTorre torre * calculaTamanhoBloco mapa
+      (posX, posY) = posicaoMapaParaEcra mapa (posicaoTorre torre)
       -- Mostra alcance só se torre estiver selecionada
       alpha = case torreSel of
                 Just t | posicaoTorre t == posicaoTorre torre -> 0.4
                 _ -> 0
    in Color (withAlpha alpha (makeColorI 111 150 168 255)) $ 
-        Translate (converteX (realToFrac x)) (converteY (realToFrac y)) $ 
+        Translate posX posY $ 
         ThickCircle raio 2
 
 desenhaPreVisualizacaoColocacao :: ImmutableTowers -> Picture
@@ -387,9 +386,7 @@ desenhaPreVisualizacaoColocacao e =
 desenhaTorreSprite :: ImmutableTowers -> Torre -> Picture
 desenhaTorreSprite e torre =
   let bloco = calculaTamanhoBloco (mapaJogo (jogo e))
-      (x, y) = posicaoTorre torre
-      posX = converteX (realToFrac x)
-      posY = converteY (realToFrac y)
+      (posX, posY) = posicaoMapaParaEcra (mapaJogo (jogo e)) (posicaoTorre torre)
    in Translate posX posY $ modeloTorre bloco (projetilTorre torre) False
 
 modeloTorre :: Float -> Projetil -> Bool -> Picture
@@ -438,13 +435,12 @@ modeloTorre bloco projetil selecionada =
       ]
 
 -- Barra de cooldown acima da torre
-desenhaCooldownTorre :: Torre -> Picture
-desenhaCooldownTorre torre =
-  let (x, y) = posicaoTorre torre
+desenhaCooldownTorre :: Mapa -> Torre -> Picture
+desenhaCooldownTorre mapa torre =
+  let (posX, posYBase) = posicaoMapaParaEcra mapa (posicaoTorre torre)
       progresso = max 0 (1 - (tempoTorre torre / cicloTorre torre))
       largura = 30 * progresso
-      posX = converteX (realToFrac x)
-      posY = converteY (realToFrac y) + 25
+      posY = posYBase + 25
       corBarra = if progresso >= 1 then makeColorI 135 174 111 255 else makeColorI 190 82 72 255
    in Translate posX posY $ Pictures [
         Color corTextoSuave $ rectangleWire 32 6,
@@ -463,15 +459,13 @@ desenhaInimigoComEfeitos :: ImmutableTowers -> Inimigo -> Picture
 desenhaInimigoComEfeitos e inimigo =
   let sprite = desenhaInimigoSprite e inimigo
       efeitos = desenhaEfeitosInimigo e inimigo
-      vidaBar = desenhaBarraVida inimigo
+      vidaBar = desenhaBarraVida (mapaJogo (jogo e)) inimigo
    in Pictures [sprite, efeitos, vidaBar]
 
 desenhaInimigoSprite :: ImmutableTowers -> Inimigo -> Picture
 desenhaInimigoSprite e inimigo =
   let bloco = calculaTamanhoBloco (mapaJogo (jogo e))
-      (x, y) = posicaoInimigo inimigo
-      posX = converteX (realToFrac x)
-      posY = converteY (realToFrac y)
+      (posX, posY) = posicaoMapaParaEcra (mapaJogo (jogo e)) (posicaoInimigo inimigo)
    in Translate posX posY $ modeloInimigo bloco
 
 modeloInimigo :: Float -> Picture
@@ -493,9 +487,7 @@ modeloInimigo bloco =
 desenhaEfeitosInimigo :: ImmutableTowers -> Inimigo -> Picture
 desenhaEfeitosInimigo e inimigo =
   let bloco = calculaTamanhoBloco (mapaJogo (jogo e))
-      (x, y) = posicaoInimigo inimigo
-      posX = converteX (realToFrac x)
-      posY = converteY (realToFrac y)
+      (posX, posY) = posicaoMapaParaEcra (mapaJogo (jogo e)) (posicaoInimigo inimigo)
       projeteis = projeteisInimigo inimigo
       
       -- Efeito de fogo (chamas)
@@ -540,16 +532,15 @@ desenhaEfeitosInimigo e inimigo =
    in Pictures [efeitoFogo, efeitoGelo, efeitoResina, efeitoMedo, efeitoVeneno, efeitoEletrico]
 
 -- Barra de vida acima do inimigo
-desenhaBarraVida :: Inimigo -> Picture
-desenhaBarraVida inimigo =
-  let (x, y) = posicaoInimigo inimigo
+desenhaBarraVida :: Mapa -> Inimigo -> Picture
+desenhaBarraVida mapa inimigo =
+  let (posX, posYBase) = posicaoMapaParaEcra mapa (posicaoInimigo inimigo)
       -- Assume vida máxima de 100 (ajustar se necessário)
       vidaMax = vidaMaxInimigoEstimado inimigo
       percentualVida = max 0 (min 1 (vidaInimigo inimigo / vidaMax))
       larguraTotal = 30
       larguraVida = larguraTotal * percentualVida
-      posX = converteX (realToFrac x)
-      posY = converteY (realToFrac y) - 25
+      posY = posYBase - 25
       corVida = if percentualVida > 0.5 then makeColorI 135 174 111 255
                 else if percentualVida > 0.25 then makeColorI 226 194 95 255
                 else makeColorI 190 82 72 255
@@ -573,13 +564,13 @@ desenhaProjeteisdeTorre e torre =
   if tempoTorre torre > cicloTorre torre * 0.8
   then
     let inimigosAlvo = take (rajadaTorre torre) (inimigosNoAlcance torre (inimigosJogo (jogo e)))
-     in map (desenhaProjetil torre) inimigosAlvo
+     in map (desenhaProjetil (mapaJogo (jogo e)) torre) inimigosAlvo
   else []
 
-desenhaProjetil :: Torre -> Inimigo -> Picture
-desenhaProjetil torre inimigo =
-  let (x1, y1) = posicaoTorre torre
-      (x2, y2) = posicaoInimigo inimigo
+desenhaProjetil :: Mapa -> Torre -> Inimigo -> Picture
+desenhaProjetil mapa torre inimigo =
+  let (sx1, sy1) = posicaoMapaParaEcra mapa (posicaoTorre torre)
+      (sx2, sy2) = posicaoMapaParaEcra mapa (posicaoInimigo inimigo)
       cor = case projetilTorre torre of
         Projetil Fogo _ -> makeColorI 175 88 58 255
         Projetil Gelo _ -> makeColorI 111 150 168 255
@@ -588,8 +579,8 @@ desenhaProjetil torre inimigo =
         Projetil Veneno _ -> makeColorI 101 168 92 255
         Projetil Eletrico _ -> makeColorI 226 194 95 255
    in Color cor $ Line [
-        (converteX (realToFrac x1), converteY (realToFrac y1)),
-        (converteX (realToFrac x2), converteY (realToFrac y2))
+        (sx1, sy1),
+        (sx2, sy2)
       ]
 
 -- ============================================================================
@@ -603,9 +594,7 @@ desenhaPortais e =
 desenhaPortal :: ImmutableTowers -> Portal -> Picture
 desenhaPortal e portal =
   let bloco = calculaTamanhoBloco (mapaJogo (jogo e))
-      (x, y) = posicaoPortal portal
-      posX = converteX (realToFrac x)
-      posY = converteY (realToFrac y)
+      (posX, posY) = posicaoMapaParaEcra (mapaJogo (jogo e)) (posicaoPortal portal)
    in Translate posX posY $ modeloPortal bloco
 
 modeloPortal :: Float -> Picture
@@ -623,9 +612,7 @@ modeloPortal bloco =
 desenhaBase :: ImmutableTowers -> Base -> Picture
 desenhaBase e base =
   let bloco = calculaTamanhoBloco (mapaJogo (jogo e))
-      (x, y) = posicaoBase base
-      posX = converteX (realToFrac x)
-      posY = converteY (realToFrac y)
+      (posX, posY) = posicaoMapaParaEcra (mapaJogo (jogo e)) (posicaoBase base)
    in Translate posX posY $ modeloBase bloco
 
 modeloBase :: Float -> Picture
@@ -993,13 +980,9 @@ calculaTamanhoBloco :: Mapa -> Float
 calculaTamanhoBloco terreno =
   fromMaybe 1 (tamanhoBloco renderLayout terreno)
 
-converteX :: Double -> Float
-converteX x = offsetMapaX mapa01 + (realToFrac x * calculaTamanhoBloco mapa01)
-
-converteY :: Double -> Float
-converteY y =
-  let altura = maybe 0 (fromIntegral . alturaMapa) (dimensoesMapa mapa01)
-   in offsetMapaY mapa01 + (altura - realToFrac y) * calculaTamanhoBloco mapa01
+posicaoMapaParaEcra :: Mapa -> Posicao -> (Float, Float)
+posicaoMapaParaEcra terreno pos =
+  fromMaybe (0, 0) (mapaParaEcra renderLayout terreno pos)
 
 offsetMapaX :: Mapa -> Float
 offsetMapaX terreno = maybe 0 fst (offsetMapa renderLayout terreno)

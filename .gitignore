@@ -118,3 +118,6 @@ $RECYCLE.BIN/
 # Immutable Towers local runtime data
 immutable-towers-meta.txt
 immutable-towers-save.txt
+
+# Generated Windows release artifacts
+release/
