@@ -51,7 +51,9 @@ data Terreno
     Terra
   | -- | Água para efeito decorativo, mas onde não se pode construir, nem os inimigos se podem mover.
     Agua
-  deriving (Eq, Show)
+  | -- | Asfalto acelera inimigos que passam por este terreno.
+    Asfalto
+  deriving (Eq, Show, Read)
 
 -- | Mapa do jogo composto por uma matriz de terrenos.
 type Mapa = [[Terreno]]
@@ -72,7 +74,7 @@ data Base = Base
     -- | Balanço de créditos do jogador.
     creditosBase :: Creditos
   }
-  deriving (Show)
+  deriving (Show, Read)
 
 -- | Distância entre duas posições.
 type Distancia = Float
@@ -86,7 +88,7 @@ data Duracao
     Finita Tempo
   | -- | Duração infinita
     Infinita
-  deriving (Eq, Show, Ord)
+  deriving (Eq, Show, Read, Ord)
 
 -- | Torre que dispara projéteis contra inimigos.
 data Torre = Torre
@@ -105,14 +107,14 @@ data Torre = Torre
     -- | Efeito secundário associado ao tipo de projétil da torre.
     projetilTorre :: Projetil
   }
-  deriving (Show)
+  deriving (Show, Read)
 
 -- | Loja de torres disponíveis para construir por uma quantidade de créditos.
 type Loja = [(Creditos, Torre)]
 
 -- | Tipo de projétil disparado por uma torre.
-data TipoProjetil = Fogo | Gelo | Resina
-  deriving (Eq, Show)
+data TipoProjetil = Fogo | Gelo | Resina | Medo | Veneno | Eletrico
+  deriving (Eq, Show, Read)
 
 -- | Projétil aplicado por uma torre.
 data Projetil = Projetil
@@ -121,7 +123,7 @@ data Projetil = Projetil
     -- | Duração do efeito do projétil no inimigo.
     duracaoProjetil :: Duracao
   }
-  deriving (Show)
+  deriving (Show, Read)
 
 -- | Direção de movimento de uma entidade no jogo.
 data Direcao
@@ -129,7 +131,7 @@ data Direcao
   | Sul
   | Este
   | Oeste
-  deriving (Eq, Show)
+  deriving (Eq, Show, Read)
 
 -- | Inimigo que se move em direção à base do jogador.
 data Inimigo = Inimigo
@@ -148,7 +150,7 @@ data Inimigo = Inimigo
     -- | Efeitos secundários ativos no inimigo.
     projeteisInimigo :: [Projetil]
   }
-  deriving (Show)
+  deriving (Show, Read)
 
 -- | Onda de inimigos que saem de um portal.
 data Onda = Onda
@@ -161,7 +163,7 @@ data Onda = Onda
     -- | Tempo restante, em segundos, para a entrada da onda.
     entradaOnda :: Tempo
   }
-  deriving (Show)
+  deriving (Show, Read)
 
 -- | Portal de entrada de inimigos no mapa.
 data Portal = Portal
@@ -170,7 +172,7 @@ data Portal = Portal
     -- | Ondas de inimigos que saem do portal.
     ondasPortal :: [Onda]
   }
-  deriving (Show)
+  deriving (Show, Read)
 
 -- | Estado do jogo. Um jogo é composto pela base, vários portais, várias torres, um mapa, vários inimigos e a loja.
 data Jogo = Jogo
@@ -187,7 +189,7 @@ data Jogo = Jogo
     -- | Loja de torres disponíveis para construir.
     lojaJogo :: Loja
   }
-  deriving (Show)
+  deriving (Show, Read)
 
 -- | Valor inicial que determina a sequência de números pseudo-aleatórios.
 type Semente = Int

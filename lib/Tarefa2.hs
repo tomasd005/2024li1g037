@@ -7,8 +7,8 @@
 -- Módulo para a realização da Tarefa 2 de LI1 em 2024/25. Este módulo implementa funções auxiliares que são usadas para o desenvolvimento da mecânica de jogo.
 module Tarefa2 where
 
+import Data.List (find)
 import LI12425
-import Tarefa1
 
 projetil1 :: Projetil
 projetil1 = Projetil {tipoProjetil = Fogo, duracaoProjetil = Finita 5.0}
@@ -43,7 +43,13 @@ inimigo2 =
 -- [Inimigo {posicaoInimigo = (0.0,0.0), direcaoInimigo = Este, vidaInimigo = 100.0, velocidadeInimigo = 1.0, ataqueInimigo = 10.0, butimInimigo = 50, projeteisInimigo = []}]
 inimigosNoAlcance :: Torre -> [Inimigo] -> [Inimigo]
 inimigosNoAlcance Torre {posicaoTorre = (x, y), alcanceTorre = alcance} inimigos =
-  filter (\Inimigo {posicaoInimigo = (a, b)} -> sqrt ((x - a) ** 2 + (y - b) ** 2) <= alcance) inimigos
+  filter dentroDoAlcance inimigos
+  where
+    alcanceQuadrado = alcance * alcance
+    dentroDoAlcance Inimigo {posicaoInimigo = (a, b)} =
+      let dx = x - a
+          dy = y - b
+       in dx * dx + dy * dy <= alcanceQuadrado
 
 -- | A função atingeInimigo atualiza o estado de um inimigo assumindo que este acaba de ser atingido por um projetil de uma torre.
 -- A vida do inimigo diminui tanto quanto o dano que o projetil da torre causa, e as sinergias entre projéteis são aplicadas.
@@ -53,9 +59,10 @@ inimigosNoAlcance Torre {posicaoTorre = (x, y), alcanceTorre = alcance} inimigos
 -- Inimigo {posicaoInimigo = (0.0,0.0), direcaoInimigo = Este, vidaInimigo = 99.0, velocidadeInimigo = 1.0, ataqueInimigo = 10.0, butimInimigo = 50, projeteisInimigo = [Projetil {tipoProjetil = Fogo, duracaoProjetil = Finita 5.0}]}
 atingeInimigo :: Torre -> Inimigo -> Inimigo
 atingeInimigo Torre {danoTorre = dano, projetilTorre = projetilNovo} inimigo@Inimigo {vidaInimigo = vida, projeteisInimigo = projeteis} =
-  let projeteisAtualizados = atualizarProjetis projetilNovo projeteis
+  let projeteisAtualizados = aplicaSinergias (atualizarProjetis projetilNovo projeteis)
+      danoExtra = danoSinergia projeteisAtualizados
    in inimigo
-        { vidaInimigo = max 0 (vida - dano),
+        { vidaInimigo = max 0 (vida - dano - danoExtra),
           projeteisInimigo = projeteisAtualizados
         }
 
@@ -91,11 +98,9 @@ encontraGelo = filter (\p -> tipoProjetil p == Gelo)
 -- [Projetil {tipoProjetil = Gelo, duracaoProjetil = Finita 3.0}]
 atingeFogoEResina :: [Projetil] -> [Projetil]
 atingeFogoEResina projeteis =
-  if not (null (filter (\p -> tipoProjetil p == Fogo) projeteis)) && not (null (filter (\p -> tipoProjetil p == Resina) projeteis))
-    then
-      let fogo = Projetil Fogo (duplicaDuracao (duracaoProjetil (head (filter (\p -> tipoProjetil p == Fogo) projeteis))))
-       in [fogo]
-    else projeteis
+  case (find (\p -> tipoProjetil p == Fogo) projeteis, find (\p -> tipoProjetil p == Resina) projeteis) of
+    (Just fogo, Just _) -> [Projetil Fogo (duplicaDuracao (duracaoProjetil fogo))]
+    _ -> projeteis
 
 -- | Devolve uma lista com apenas projeteis do tipo Fogo presentes na lista.
 --
@@ -142,6 +147,24 @@ dividePorTipoProjetil projeteis = (fogos, gelos, resinas)
     gelos = filter (\p -> tipoProjetil p == Gelo) projeteis
     resinas = filter (\p -> tipoProjetil p == Resina) projeteis
 
+aplicaSinergias :: [Projetil] -> [Projetil]
+aplicaSinergias projeteis =
+  let tipos = map tipoProjetil projeteis
+      base = if Fogo `elem` tipos && Resina `elem` tipos
+             then atingeFogoEResina projeteis
+             else fogoEGelo projeteis
+      extra =
+        [Projetil Eletrico (Finita 1.2) | Gelo `elem` tipos && Eletrico `elem` tipos]
+          ++ [Projetil Medo (Finita 2.5) | Medo `elem` tipos && Veneno `elem` tipos]
+   in somaProjetil (base ++ extra)
+
+danoSinergia :: [Projetil] -> Float
+danoSinergia projeteis =
+  let tipos = map tipoProjetil projeteis
+   in sum
+        [8 | Fogo `elem` tipos && Eletrico `elem` tipos]
+          + sum [5 | Veneno `elem` tipos && Resina `elem` tipos]
+
 -- | Soma as durações de uma lista de projeteis.
 --
 -- == Exemplo:
@@ -163,6 +186,7 @@ somaDuracoes (Finita t : ds) = case somaDuracoes ds of
 -- True
 -- >>> verificaIguais [projetil2, projetil3]
 -- False
+verificaIguais :: [Projetil] -> Bool
 verificaIguais projeteis =
   any (\l -> length l > 1) [fogos, gelos, resinas]
   where
@@ -190,9 +214,9 @@ somaProjetil (p : ps) =
 -- (Portal {posicaoPortal = (0.0,0.0), ondasPortal = []},[])
 ativaInimigo :: Portal -> [Inimigo] -> (Portal, [Inimigo])
 ativaInimigo portal@Portal {ondasPortal = []} inimigos = (portal, inimigos)
-ativaInimigo portal@Portal {ondasPortal = (onda@Onda {inimigosOnda = []} : outrasOndas)} inimigos =
+ativaInimigo portal@Portal {ondasPortal = (Onda {inimigosOnda = []} : _)} inimigos =
   (portal, inimigos)
-ativaInimigo portal@Portal {ondasPortal = (onda@Onda {inimigosOnda = (i : is), cicloOnda = ciclo, tempoOnda = tempo, entradaOnda = entrada} : outrasOndas)} inimigos =
+ativaInimigo portal@Portal {ondasPortal = (Onda {inimigosOnda = (i : is), cicloOnda = ciclo, tempoOnda = tempo, entradaOnda = entrada} : outrasOndas)} inimigos =
   let novaOnda = Onda {inimigosOnda = is, cicloOnda = ciclo, tempoOnda = tempo, entradaOnda = entrada}
       novasOndas = if null is then outrasOndas else novaOnda : outrasOndas
    in (portal {ondasPortal = novasOndas}, inimigos ++ [i])
@@ -239,6 +263,7 @@ atualizarProjetis :: Projetil -> [Projetil] -> [Projetil]
 atualizarProjetis projetilNovo projeteis =
   let projeteisCompatíveis = case tipoProjetil projetilNovo of
         Fogo -> filter (\p -> tipoProjetil p /= Resina) projeteis
+        Eletrico -> filter (\p -> tipoProjetil p /= Gelo) projeteis
         _ -> projeteis
    in projeteisCompatíveis ++ [projetilNovo]
 

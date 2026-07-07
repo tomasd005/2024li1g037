@@ -9,10 +9,12 @@
 -- disparo de torres, e atualização do estado do jogo.
 module Tarefa3 where
 
-import Data.List (sortBy)
 import Data.Function (on)
+import Data.List (sortBy)
+import qualified Data.IntMap.Strict as IntMap
+import EnemySpatial
 import LI12425
-import Tarefa1
+import MapGeometry
 import Tarefa2
 
 -- ============================================================================
@@ -128,15 +130,15 @@ processaOndas tempo (onda:ondas) posPortal
       -- Processa as próximas ondas recursivamente
       processaOndas tempo ondas posPortal
   -- Caso contrário, lança um inimigo
-  | otherwise =
-      let (inimigo:restantes) = inimigosOnda onda
-          inimigoLancado = inimigo {posicaoInimigo = posPortal}
+  | inimigo : restantes <- inimigosOnda onda =
+      let inimigoLancado = inimigo {posicaoInimigo = posPortal}
           -- Se ainda há inimigos, mantém a onda com tempo resetado
           -- Se não há mais, remove a onda
           novasOndas = if null restantes
                        then ondas
                        else onda {inimigosOnda = restantes, tempoOnda = cicloOnda onda} : ondas
        in (novasOndas, [inimigoLancado])
+  | otherwise = processaOndas tempo ondas posPortal
 
 -- ============================================================================
 -- ATUALIZAÇÃO DE TORRES
@@ -150,10 +152,51 @@ processaOndas tempo (onda:ondas) posPortal
 -- True
 atualizaTodasTorres :: Tempo -> [Inimigo] -> [Torre] -> ([Torre], [Inimigo])
 atualizaTodasTorres tempo inimigos torres =
-  foldr (\torre (ts, is) -> 
-    let (t', is') = atualizaTorre tempo is torre
-     in (t':ts, is')
-  ) ([], inimigos) torres
+  let inimigosIndexados = zip [0 :: Int ..] inimigos
+      alcanceMaximo = foldr (max . alcanceTorre) 1 torres
+      grid = buildSpatialGrid alcanceMaximo inimigosIndexados
+      inimigosPorIndice = IntMap.fromAscList inimigosIndexados
+      (torresAtualizadas, inimigosAtualizados) =
+        foldr (atualizaTorreComGrid tempo grid) ([], inimigosPorIndice) torres
+   in (torresAtualizadas, IntMap.elems inimigosAtualizados)
+
+atualizaTorreComGrid :: Tempo -> SpatialGrid -> Torre -> ([Torre], IntMap.IntMap Inimigo) -> ([Torre], IntMap.IntMap Inimigo)
+atualizaTorreComGrid tempo grid torre (torresAtualizadas, inimigosPorIndice) =
+  let torreComTempoAtualizado = torre {tempoTorre = tempoTorre torre - tempo}
+   in if tempoTorre torreComTempoAtualizado <= 0
+      then
+        let (torreRecarregada, inimigosAposDisparo) =
+              dispararTorreComGrid grid torreComTempoAtualizado inimigosPorIndice
+         in (torreRecarregada : torresAtualizadas, inimigosAposDisparo)
+      else (torreComTempoAtualizado : torresAtualizadas, inimigosPorIndice)
+
+dispararTorreComGrid :: SpatialGrid -> Torre -> IntMap.IntMap Inimigo -> (Torre, IntMap.IntMap Inimigo)
+dispararTorreComGrid grid torre inimigosPorIndice =
+  let candidatos = inimigosNoAlcanceGrid grid torre inimigosPorIndice
+      inimigosOrdenados = sortBy (compare `on` distanciaDaTorreIndice torre) candidatos
+      alvos = take (rajadaTorre torre) inimigosOrdenados
+      inimigosAtingidos =
+        foldl' (\acc (indice, inimigo) -> IntMap.insert indice (atingeInimigo torre inimigo) acc) inimigosPorIndice alvos
+      torreRecarregada = torre {tempoTorre = cicloTorre torre}
+   in (torreRecarregada, inimigosAtingidos)
+
+inimigosNoAlcanceGrid :: SpatialGrid -> Torre -> IntMap.IntMap Inimigo -> [(Int, Inimigo)]
+inimigosNoAlcanceGrid grid torre inimigosPorIndice =
+  let alcance = alcanceTorre torre
+      alcanceQuadrado = alcance * alcance
+      posTorre = posicaoTorre torre
+      candidatos = queryEnemyIndices grid posTorre alcance
+   in foldr (adicionaSeDentro alcanceQuadrado posTorre) [] candidatos
+  where
+    adicionaSeDentro alcanceQuadrado posTorre indice acc =
+      case IntMap.lookup indice inimigosPorIndice of
+        Just inimigo
+          | distanciaQuadrada posTorre (posicaoInimigo inimigo) <= alcanceQuadrado ->
+              (indice, inimigo) : acc
+        _ -> acc
+
+distanciaDaTorreIndice :: Torre -> (Int, Inimigo) -> Float
+distanciaDaTorreIndice torre (_, inimigo) = distanciaDaTorre torre inimigo
 
 -- | Atualiza uma torre: decrementa tempo e dispara se pronta.
 --
@@ -194,7 +237,7 @@ distanciaDaTorre :: Torre -> Inimigo -> Float
 distanciaDaTorre torre inimigo =
   let (x1, y1) = posicaoTorre torre
       (x2, y2) = posicaoInimigo inimigo
-   in sqrt ((x1 - x2)^2 + (y1 - y2)^2)
+   in distanciaQuadrada (x1, y1) (x2, y2)
 
 -- ============================================================================
 -- ATUALIZAÇÃO DE INIMIGOS
@@ -264,20 +307,21 @@ aplicaEfeitoProjetil tempo inimigo =
   let projeteis = projeteisInimigo inimigo
       -- Efeito de fogo: 2 dano por segundo
       temFogo = any (\p -> tipoProjetil p == Fogo) projeteis
-      vidaAposFogo = if temFogo 
-                     then max 0 (vidaInimigo inimigo - (2.0 * tempo))
-                     else vidaInimigo inimigo
+      temVeneno = any (\p -> tipoProjetil p == Veneno) projeteis
+      danoContinuo = (if temFogo then 2.0 else 0) + (if temVeneno then 3.2 else 0)
+      vidaAposEfeitos = max 0 (vidaInimigo inimigo - danoContinuo * tempo)
       
       -- Efeito de gelo: impede movimento
       temGelo = any (\p -> tipoProjetil p == Gelo) projeteis
-      velocAposGelo = if temGelo then 0 else velocidadeInimigo inimigo
+      temEletrico = any (\p -> tipoProjetil p == Eletrico) projeteis
+      velocAposControlo = if temGelo || temEletrico then 0 else velocidadeInimigo inimigo
       
       -- Efeito de resina: reduz velocidade para 80%
       temResina = any (\p -> tipoProjetil p == Resina) projeteis
-      velocFinal = if temResina then velocAposGelo * 0.8 else velocAposGelo
+      velocFinal = if temResina then velocAposControlo * 0.8 else velocAposControlo
    
    in inimigo {
-        vidaInimigo = vidaAposFogo,
+        vidaInimigo = vidaAposEfeitos,
         velocidadeInimigo = velocFinal
       }
 
@@ -320,8 +364,11 @@ removeProjeteisExpirados inimigo =
 -- True
 moverInimigo :: Tempo -> Mapa -> Inimigo -> Inimigo
 moverInimigo tempo mapa inimigo =
-  let novaDirecao = proximaDirecao mapa (posicaoInimigo inimigo) (direcaoInimigo inimigo)
-      distancia = velocidadeInimigo inimigo * tempo
+  let assustado = any (\p -> tipoProjetil p == Medo) (projeteisInimigo inimigo)
+      novaDirecao = if assustado
+                    then getDirecaoOposta (direcaoInimigo inimigo)
+                    else proximaDirecao mapa (posicaoInimigo inimigo) (direcaoInimigo inimigo)
+      distancia = velocidadeInimigo inimigo * tempo * multiplicadorTerreno mapa (posicaoInimigo inimigo)
       novaPos = moverNaDirecao (posicaoInimigo inimigo) novaDirecao distancia
    in inimigo {posicaoInimigo = novaPos, direcaoInimigo = novaDirecao}
 
@@ -349,9 +396,10 @@ proximaDirecao mapa pos direcaoAtual =
       direcoesPermitidas = filter (\(d, _) -> d /= direcaoOposta) vizinhos
    in case direcoesPermitidas of
         [] -> direcaoAtual
-        _ -> case filter (\(d, _) -> d == direcaoAtual) direcoesPermitidas of
-               (d, _):_ -> d
-               [] -> fst (head direcoesPermitidas)
+        primeiraDirecao : _ ->
+          case filter (\(d, _) -> d == direcaoAtual) direcoesPermitidas of
+            (d, _) : _ -> d
+            [] -> fst primeiraDirecao
 
 -- | Retorna vizinhos válidos (em terra).
 --
@@ -375,11 +423,13 @@ vizinhosValidos mapa (x, y) =
 -- True
 posicaoValidaTerra :: Mapa -> Posicao -> Bool
 posicaoValidaTerra mapa (x, y) =
-  let ix = floor x
-      iy = floor y
-   in ix >= 0 && iy >= 0 && 
-      iy < length mapa && ix < length (head mapa) &&
-      mapa !! iy !! ix == Terra
+  terrenoEmCelula mapa (floor x) (floor y) `elem` [Just Terra, Just Asfalto]
+
+multiplicadorTerreno :: Mapa -> Posicao -> Float
+multiplicadorTerreno mapa (x, y) =
+  case terrenoEmCelula mapa (floor x) (floor y) of
+    Just Asfalto -> 1.45
+    _ -> 1
 
 -- | Retorna direção oposta.
 --
@@ -411,8 +461,8 @@ separaInimigosPorEstado inimigos posBase =
       | posicaoInimigo i `proxima` posBase = (mortos, vivos, i:naBase)
       | otherwise = (mortos, i:vivos, naBase)
     
-    proxima (x1, y1) (x2, y2) = 
-      sqrt ((x1 - x2)^2 + (y1 - y2)^2) < 0.5
+    proxima p1 p2 =
+      distanciaQuadrada p1 p2 < 0.25
 
 -- | Verifica se inimigo morreu.
 --
@@ -448,9 +498,7 @@ aplicaEfeito projetil inimigo =
 -- False
 atingiuBase :: Base -> Inimigo -> Bool
 atingiuBase base inimigo =
-  let (x1, y1) = posicaoBase base
-      (x2, y2) = posicaoInimigo inimigo
-   in sqrt ((x1 - x2)^2 + (y1 - y2)^2) < 0.5
+  distanciaQuadrada (posicaoBase base) (posicaoInimigo inimigo) < 0.25
 
 -- | Atualiza a base do jogo.
 --
@@ -481,6 +529,12 @@ atualizaOnda tempo _ onda =
 -- >>> length (ondasPortal portal') <= length (ondasPortal portal01)
 -- True
 atualizaPortal :: Tempo -> [Inimigo] -> Portal -> Portal
-atualizaPortal tempo inimigos portal =
+atualizaPortal tempo _ portal =
   let (ondas', _) = processaOndas tempo (ondasPortal portal) (posicaoPortal portal)
    in portal {ondasPortal = ondas'}
+
+distanciaQuadrada :: Posicao -> Posicao -> Float
+distanciaQuadrada (x1, y1) (x2, y2) =
+  let dx = x1 - x2
+      dy = y1 - y2
+   in dx * dx + dy * dy

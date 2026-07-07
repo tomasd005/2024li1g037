@@ -114,3 +114,7 @@ $RECYCLE.BIN/
 
 # Windows shortcuts
 *.lnk
+
+# Immutable Towers local runtime data
+immutable-towers-meta.txt
+immutable-towers-save.txt

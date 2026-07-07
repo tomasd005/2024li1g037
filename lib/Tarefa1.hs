@@ -10,6 +10,7 @@ module Tarefa1 where
 
 import Data.List
 import LI12425
+import MapGeometry
 
 mapa1 :: [[Terreno]]
 mapa1 =
@@ -35,7 +36,7 @@ inimigo1 :: Inimigo
 inimigo1 = Inimigo {posicaoInimigo = (0, 0), direcaoInimigo = Este, velocidadeInimigo = 1.0, vidaInimigo = 100.0, ataqueInimigo = 10.0, butimInimigo = 50, projeteisInimigo = []}
 
 torre1 :: Torre
-torre1 = Torre {posicaoTorre = (0, 1), alcanceTorre = 2.0, rajadaTorre = 3, cicloTorre = 1.0, danoTorre = 1.0, tempoTorre = 2.0}
+torre1 = Torre {posicaoTorre = (0, 1), alcanceTorre = 2.0, rajadaTorre = 3, cicloTorre = 1.0, danoTorre = 1.0, tempoTorre = 2.0, projetilTorre = Projetil Fogo (Finita 1.0)}
 
 jogo1 :: Jogo
 jogo1 = Jogo {mapaJogo = mapa1, baseJogo = base1, portaisJogo = [portal1], inimigosJogo = [inimigo1], torresJogo = [torre1], lojaJogo = [(50, torre1)]}
@@ -71,14 +72,10 @@ validaPortais jogo =
 -- >>> posicaoPortalValida (0, 0) mapa1
 -- True
 posicaoPortalValida :: Posicao -> Mapa -> Bool
-posicaoPortalValida (x, y) mapa =
-  x >= 0
-    && y >= 0
-    && x < fromIntegral (length mapa)
-    && y < fromIntegral (length (head mapa))
-    && case terrenoPorPosicao (x, y) mapa of
-      Just terra -> terra /= Agua
-      Nothing -> False
+posicaoPortalValida pos mapa =
+  case terrenoPorPosicao pos mapa of
+    Just terra -> terra /= Agua
+    Nothing -> False
 
 -- |
 -- Verifica se uma onda de inimigos associada a um portal é válida.
@@ -117,9 +114,7 @@ minimoPortal portais = not (null portais)
 -- Just Terra
 terrenoPorPosicao :: Posicao -> Mapa -> Maybe Terreno
 terrenoPorPosicao (x, y) mapa =
-  if x < 0 || y < 0 || floor x >= length mapa || floor y >= length (head mapa)
-    then Nothing
-    else Just (mapa !! floor y !! floor x)
+  terrenoEmCelula mapa (floor x) (floor y)
 
 -- |
 -- Verifica se todos os portais estão posicionados sobre terrenos "Terra" no mapa.
@@ -128,7 +123,7 @@ terrenoPorPosicao (x, y) mapa =
 -- >>> posicionadoEmTerra mapa1 [portal1]
 -- True
 posicionadoEmTerra :: Mapa -> [Portal] -> Bool
-posicionadoEmTerra mapa portais = all (\portal -> terrenoPorPosicao (posicaoPortal portal) mapa == Just Terra) portais
+posicionadoEmTerra mapa portais = all (\portal -> terrenoCaminhavel (posicaoPortal portal) mapa) portais
 
 -- |
 -- Verifica se todas as torres estão posicionadas sobre terrenos "Relva" no mapa.
@@ -202,7 +197,7 @@ buscaCaminho mapa atual destino visitados
   | atual == destino = True
   | not (posicaoValida mapa atual) = False
   | atual `elem` visitados = False
-  | terrenoPorPosicao atual mapa /= Just Terra = False
+  | not (terrenoCaminhavel atual mapa) = False
   | otherwise =
       let visitados' = atual : visitados
           vizinhos = adjacentes atual
@@ -225,9 +220,7 @@ adjacentes (x, y) = [(x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1)]
 -- True
 posicaoValida :: Mapa -> (Float, Float) -> Bool
 posicaoValida mapa (x, y) =
-  let ix = floor x
-      iy = floor y
-   in ix >= 0 && ix < length mapa && iy >= 0 && iy < length (head mapa)
+  dentroMapa mapa (floor x) (floor y)
 
 -- |
 -- Verifica as condições de validade dos inimigos no jogo.
@@ -338,6 +331,7 @@ validaBase jogo =
     baseSobreTerra mapa base =
       case terrenoPorPosicao (posicaoBase base) mapa of
         Just Terra -> True
+        Just Asfalto -> True
         _ -> False
 
     sobrepoeTorreOuPortal base torres portais =
@@ -354,4 +348,11 @@ validaBase jogo =
 -- True
 posicionadoEmTerraBase :: Mapa -> Base -> Bool
 posicionadoEmTerraBase mapa base =
-  terrenoPorPosicao (posicaoBase base) mapa == Just Terra
+  terrenoCaminhavel (posicaoBase base) mapa
+
+terrenoCaminhavel :: Posicao -> Mapa -> Bool
+terrenoCaminhavel pos mapa =
+  case terrenoPorPosicao pos mapa of
+    Just Terra -> True
+    Just Asfalto -> True
+    _ -> False
