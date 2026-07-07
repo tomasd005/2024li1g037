@@ -2,6 +2,7 @@ module ImmutableTowers where
 
 import Graphics.Gloss
 import LI12425
+import MetaTypes
 
 type Imagens = [(Imagem, Maybe Picture)]
 
@@ -15,11 +16,16 @@ data ImmutableTowers = ImmutableTowers
     posicaoRato :: Maybe (Float, Float),
     perfilJogador :: PerfilJogador,
     leaderboardLocal :: [Pontuacao],
+    progressoMeta :: MetaProgress,
     modoJogoEscolhido :: ModoJogoEscolhido,
+    mapaAtual :: MapId,
     ondasSobrevividas :: Int,
+    totalOndasPartida :: Int,
     resultadoRegistado :: Bool,
     velocidadeJogo :: Float,
-    mensagensUI :: [MensagemUI]
+    mensagensUI :: [MensagemUI],
+    hudCompacto :: Bool,
+    lojaVisivel :: Bool
   }
 
 data TipoMensagem = MsgInfo | MsgSucesso | MsgAviso | MsgErro
@@ -91,6 +97,7 @@ data Imagem
 data MenuInicialOpcoes
   = Jogar
   | Modos
+  | LojaMeta
   | Perfil
   | Leaderboard
   | Creditos
@@ -106,6 +113,7 @@ data Modo
   | MostrarPerfil
   | MostrarLeaderboard
   | MostrarOpcoes
+  | MostrarLojaMeta
   | SelecionarModo
   | EditorMapa
   | Pausado
@@ -129,7 +137,7 @@ pixeis :: Int
 pixeis = 32
 
 larguraJanela :: Float
-larguraJanela = 1152
+larguraJanela = 1920
 
 alturaJanela :: Float
 alturaJanela = 1080

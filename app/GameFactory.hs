@@ -1,45 +1,52 @@
 module GameFactory
   ( baseParaModo,
-    jogoParaModo,
-    mapaParaModo,
+    prepararPartida,
+    modoDesbloqueado,
+    nivelMinimoModo,
   )
 where
 
 import ImmutableTowers (ModoJogoEscolhido (..))
 import LI12425
 import MapData
+import MetaTypes
+import ProgressionSystem
 import TowerSystem
 import WaveSystem
 
-baseParaModo :: ModoJogoEscolhido -> Base
-baseParaModo modoAtual = base01
-  { creditosBase = case modoAtual of
-      ModoSandbox -> 999
-      ModoDesafio -> 115
-      ModoBoss -> 180
-      ModoInfinito -> 165
-      ModoHistoria -> 150,
-    vidaBase = case modoAtual of
-      ModoDesafio -> 55
-      ModoBoss -> 100
-      _ -> 80
-  }
-
-jogoParaModo :: ModoJogoEscolhido -> Jogo
-jogoParaModo modoAtual =
-  Jogo
-    { mapaJogo = mapaParaModo modoAtual,
-      baseJogo = baseParaModo modoAtual,
-      portaisJogo = [portalBase {ondasPortal = ondasParaModo modoAtual}],
-      torresJogo = [],
-      inimigosJogo = [],
-      lojaJogo = lojaParaModo modoAtual
+baseParaModo :: ModoJogoEscolhido -> MapId -> Base
+baseParaModo modoAtual mapaId =
+  (basePorMapa mapaId)
+    { creditosBase = case modoAtual of
+        ModoSandbox -> 999
+        ModoDesafio -> 125
+        ModoBoss -> 180
+        ModoInfinito -> 165
+        ModoHistoria -> 150,
+      vidaBase = case modoAtual of
+        ModoDesafio -> 60
+        ModoBoss -> 110
+        _ -> 80
     }
 
-mapaParaModo :: ModoJogoEscolhido -> Mapa
-mapaParaModo modoAtual = case modoAtual of
-  ModoHistoria -> mapa01
-  ModoInfinito -> mapa02
-  ModoDesafio -> mapa02
-  ModoBoss -> mapa01
-  ModoSandbox -> mapa01
+prepararPartida :: ModoJogoEscolhido -> MetaProgress -> (Jogo, MapId, Int, MetaProgress)
+prepararPartida modoAtual meta =
+  let mapaId = mapaParaPartida modoAtual meta
+      waves = case modoAtual of
+        ModoHistoria -> wavesHistoria meta
+        _ -> ondasParaModo modoAtual
+      totalOndas = totalOndasPartidaModo modoAtual meta
+      metaAtualizado =
+        if modoAtual == ModoHistoria
+          then meta
+          else meta {rotacaoMapasAtual = rotacaoMapasAtual meta + 1}
+      jogoNovo =
+        Jogo
+          { mapaJogo = mapaPorId mapaId,
+            baseJogo = baseParaModo modoAtual mapaId,
+            portaisJogo = [(portalPorMapa mapaId) {ondasPortal = waves}],
+            torresJogo = [],
+            inimigosJogo = [],
+            lojaJogo = lojaParaModo modoAtual meta
+          }
+   in (jogoNovo, mapaId, totalOndas, metaAtualizado)

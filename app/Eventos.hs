@@ -8,10 +8,12 @@ import ImmutableTowers
 import LI12425
 import qualified MapEditor as Editor
 import MapGeometry
+import MetaTypes
 import SaveSystem
 import System.Exit (exitSuccess)
 import TowerSystem
 import UIComponents
+import UIRects
 
 mapaLarguraMaxInput, mapaAlturaMaxInput, mapaCentroYInput :: Float
 mapaLarguraMaxInput = 900
@@ -26,7 +28,8 @@ reage (EventMotion pos) estado = return estado {posicaoRato = Just pos}
 reage (EventKey (SpecialKey KeyRight) Down _ _) e =
   case modo e of
     MenuInicial Jogar -> return e {modo = MenuInicial Modos}
-    MenuInicial Modos -> return e {modo = MenuInicial Perfil}
+    MenuInicial Modos -> return e {modo = MenuInicial LojaMeta}
+    MenuInicial LojaMeta -> return e {modo = MenuInicial Perfil}
     MenuInicial Perfil -> return e {modo = MenuInicial Leaderboard}
     MenuInicial Leaderboard -> return e {modo = MenuInicial Creditos}
     MenuInicial Creditos -> return e {modo = MenuInicial Opcoes}
@@ -36,24 +39,26 @@ reage (EventKey (SpecialKey KeyRight) Down _ _) e =
 reage (EventKey (SpecialKey KeyLeft) Down _ _) e =
   case modo e of
     MenuInicial Modos -> return e {modo = MenuInicial Jogar}
-    MenuInicial Perfil -> return e {modo = MenuInicial Modos}
+    MenuInicial LojaMeta -> return e {modo = MenuInicial Modos}
+    MenuInicial Perfil -> return e {modo = MenuInicial LojaMeta}
     MenuInicial Leaderboard -> return e {modo = MenuInicial Perfil}
     MenuInicial Creditos -> return e {modo = MenuInicial Leaderboard}
     MenuInicial Opcoes -> return e {modo = MenuInicial Creditos}
     MenuInicial Sair -> return e {modo = MenuInicial Opcoes}
     SelecionarModo -> guardarModoSelecionado e (modoJogoAnterior (modoJogoEscolhido e))
     _ -> return e
-reage (EventKey (MouseButton LeftButton) Down _ (mx, my)) e@(ImmutableTowers _ _ (MenuInicial _) _ _ _ _ _ _ _ _ _ _ _) =
+reage (EventKey (MouseButton LeftButton) Down _ (mx, my)) e@ImmutableTowers {modo = MenuInicial _} =
   case opcaoMenuClicada mx my of
     Just Jogar -> return (iniciarPartida e)
     Just Modos -> return e {modo = SelecionarModo}
+    Just LojaMeta -> return e {modo = MostrarLojaMeta}
     Just Perfil -> return e {modo = MostrarPerfil}
     Just Leaderboard -> return e {modo = MostrarLeaderboard}
     Just Creditos -> return e {modo = TutorialFoto}
     Just Opcoes -> return e {modo = MostrarOpcoes}
     Just Sair -> exitSuccess
     Nothing -> return e
-reage (EventKey (MouseButton LeftButton) Down _ (mx, my)) e@(ImmutableTowers _ _ SelecionarModo _ _ _ _ _ _ _ _ _ _ _) =
+reage (EventKey (MouseButton LeftButton) Down _ (mx, my)) e@ImmutableTowers {modo = SelecionarModo} =
   case modoClicado mx my of
     Just modoEscolhido -> guardarModoSelecionado e modoEscolhido
     Nothing -> return e
@@ -61,6 +66,7 @@ reage (EventKey (SpecialKey KeyEnter) Down _ _) e =
   case modo e of
     MenuInicial Jogar -> return (iniciarPartida e)
     MenuInicial Modos -> return e {modo = SelecionarModo}
+    MenuInicial LojaMeta -> return e {modo = MostrarLojaMeta}
     MenuInicial Perfil -> return e {modo = MostrarPerfil}
     MenuInicial Leaderboard -> return e {modo = MostrarLeaderboard}
     MenuInicial Sair -> exitSuccess
@@ -71,6 +77,7 @@ reage (EventKey (SpecialKey KeyEnter) Down _ _) e =
     MostrarPerfil -> return e {modo = MenuInicial Perfil}
     MostrarLeaderboard -> return e {modo = MenuInicial Leaderboard}
     MostrarOpcoes -> return e {modo = MenuInicial Opcoes}
+    MostrarLojaMeta -> return e {modo = MenuInicial LojaMeta}
     SelecionarModo -> return e {modo = MenuInicial Modos}
     EditorMapa -> return e {modo = MenuInicial Modos}
     _ -> return e
@@ -82,11 +89,11 @@ reage (EventKey (SpecialKey KeyBackspace) Down _ _) estado = apagarCaracterPerfi
 reage (EventKey (SpecialKey KeyDelete) Down _ _) estado = apagarCaracterPerfil estado
 reage (EventKey (Char '\b') Down _ _) estado = apagarCaracterPerfil estado
 reage (EventKey (Char '\DEL') Down _ _) estado = apagarCaracterPerfil estado
-reage (EventKey (Char c) Down _ _) estado@(ImmutableTowers _ _ MostrarPerfil _ _ _ _ perfil leaderboard modoAtual _ _ _ _)
+reage (EventKey (Char c) Down _ _) estado@ImmutableTowers {modo = MostrarPerfil, perfilJogador = perfil, leaderboardLocal = leaderboard, modoJogoEscolhido = modoAtual}
   | c >= ' ' && c <= '~' && length (nomeJogador perfil) < 16 =
       let novoPerfil = perfil {nomeJogador = nomeJogador perfil ++ [c]}
        in do
-            guardarMetaEstado novoPerfil leaderboard modoAtual
+            guardarMetaEstado novoPerfil leaderboard modoAtual (progressoMeta estado)
             return estado {perfilJogador = novoPerfil}
   | otherwise = return estado
 reage (EventKey (SpecialKey KeyEsc) Down _ _) e =
@@ -95,6 +102,7 @@ reage (EventKey (SpecialKey KeyEsc) Down _ _) e =
     MostrarPerfil -> return e {modo = MenuInicial Perfil}
     MostrarLeaderboard -> return e {modo = MenuInicial Leaderboard}
     MostrarOpcoes -> return e {modo = MenuInicial Opcoes}
+    MostrarLojaMeta -> return e {modo = MenuInicial LojaMeta}
     SelecionarModo -> return e {modo = MenuInicial Modos}
     EditorMapa -> return e {modo = MenuInicial Modos}
     EmJogo ->
@@ -116,9 +124,35 @@ reage (EventKey (Char 'x') Down _ _) e =
       let novaVel = proximaVelocidade (velocidadeJogo e)
        in return $ adicionaMensagem MsgInfo ("Velocidade " ++ show (round novaVel :: Int) ++ "x") e {velocidadeJogo = novaVel}
     _ -> return e
-reage (EventKey (Char 'u') Down _ _) estado@(ImmutableTowers jogoAtual _ EmJogo _ _ foco _ _ _ _ _ _ _ _) =
+reage (EventKey (Char 'h') Down _ _) e =
+  case modo e of
+    EmJogo -> return e {hudCompacto = not (hudCompacto e)}
+    _ -> return e
+reage (EventKey (Char 'k') Down _ _) e =
+  case modo e of
+    EmJogo -> return e {lojaVisivel = not (lojaVisivel e)}
+    _ -> return e
+reage (EventKey (Char '1') Down _ _) e@ImmutableTowers {modo = MostrarLojaMeta, progressoMeta = meta} = do
+  let (metaNovo, texto) = abrirBau BauMadeira meta
+  guardarMetaEstado (perfilJogador e) (leaderboardLocal e) (modoJogoEscolhido e) metaNovo
+  return $ adicionaMensagem MsgInfo texto e {progressoMeta = metaNovo}
+reage (EventKey (Char '2') Down _ _) e@ImmutableTowers {modo = MostrarLojaMeta, progressoMeta = meta} = do
+  let (metaNovo, texto) = abrirBau BauCristal meta
+  guardarMetaEstado (perfilJogador e) (leaderboardLocal e) (modoJogoEscolhido e) metaNovo
+  return $ adicionaMensagem MsgInfo texto e {progressoMeta = metaNovo}
+reage (EventKey (Char '3') Down _ _) e@ImmutableTowers {modo = MostrarLojaMeta, progressoMeta = meta} = do
+  let (metaNovo, texto) = abrirBau BauImperial meta
+  guardarMetaEstado (perfilJogador e) (leaderboardLocal e) (modoJogoEscolhido e) metaNovo
+  return $ adicionaMensagem MsgInfo texto e {progressoMeta = metaNovo}
+reage (EventKey (Char 'f') Down _ _) e@ImmutableTowers {modo = MostrarLojaMeta, progressoMeta = meta} =
+  case tentaFundirTempestade meta of
+    Right metaNovo -> do
+      guardarMetaEstado (perfilJogador e) (leaderboardLocal e) (modoJogoEscolhido e) metaNovo
+      return $ adicionaMensagem MsgSucesso "Fusao concluida: Tempestade" e {progressoMeta = metaNovo}
+    Left erro -> return $ adicionaMensagem MsgAviso erro e
+reage (EventKey (Char 'u') Down _ _) estado@ImmutableTowers {jogo = jogoAtual, modo = EmJogo, torreFocada = foco} =
   return $ upgradeSelecionada estado jogoAtual foco
-reage (EventKey (Char 's') Down _ _) estado@(ImmutableTowers jogoAtual _ EmJogo _ _ _ _ _ _ _ _ _ _ _) = do
+reage (EventKey (Char 's') Down _ _) estado@ImmutableTowers {jogo = jogoAtual, modo = EmJogo} = do
   guardarJogoLocal jogoAtual
   return $ adicionaMensagem MsgSucesso "Jogo guardado" estado
 reage (EventKey (Char 'l') Down _ _) estado = do
@@ -126,20 +160,20 @@ reage (EventKey (Char 'l') Down _ _) estado = do
   case guardado of
     Just jogoGuardado -> return estado {jogo = jogoGuardado, modo = EmJogo, torreSelecionada = Nothing, torreFocada = Nothing}
     Nothing -> return estado
-reage (EventKey (Char 'b') Down _ _) estado@(ImmutableTowers jogoAtual _ EmJogo _ _ _ _ _ _ _ _ _ _ _) =
+reage (EventKey (Char 'b') Down _ _) estado@ImmutableTowers {jogo = jogoAtual, modo = EmJogo} =
   return $ adicionaMensagem MsgInfo "Bot sugeriu uma construcao" estado {jogo = botColocaTorre jogoAtual}
-reage (EventKey (Char 'o') Down _ _) estado@(ImmutableTowers jogoAtual _ EmJogo _ _ _ rato _ _ _ _ _ _ _) =
+reage (EventKey (Char 'o') Down _ _) estado@ImmutableTowers {jogo = jogoAtual, modo = EmJogo, posicaoRato = rato} =
   return $ case rato of
     Just pos -> adicionaMensagem MsgAviso "Obstaculo colocado" estado {jogo = jogoAtual {mapaJogo = Editor.colocaObstaculo editorConfig pos (mapaJogo jogoAtual)}}
     Nothing -> estado
-reage (EventKey (MouseButton LeftButton) Down _ pos) estado@(ImmutableTowers jogoAtual _ EditorMapa _ _ _ _ _ _ _ _ _ _ _) =
+reage (EventKey (MouseButton LeftButton) Down _ pos) estado@ImmutableTowers {jogo = jogoAtual, modo = EditorMapa} =
   return estado {jogo = jogoAtual {mapaJogo = Editor.cicloCelulaMapa editorConfig pos (mapaJogo jogoAtual)}}
-reage (EventKey (MouseButton RightButton) Down _ _) estado@(ImmutableTowers _ _ EmJogo _ _ _ _ _ _ _ _ _ _ _) =
+reage (EventKey (MouseButton RightButton) Down _ _) estado@ImmutableTowers {modo = EmJogo} =
   return estado {torreSelecionada = Nothing, torreFocada = Nothing}
-reage (EventKey (MouseButton LeftButton) Down _ pos@(mx, my)) estado@(ImmutableTowers jogoAtual _ EmJogo _ Nothing _ _ _ _ _ _ _ _ _) =
+reage (EventKey (MouseButton LeftButton) Down _ pos@(mx, my)) estado@ImmutableTowers {jogo = jogoAtual, modo = EmJogo, torreSelecionada = Nothing} =
   case acaoJogoClicada pos estado of
     Just novoEstado -> return novoEstado
-    Nothing ->
+    Nothing | lojaVisivel estado ->
       case find (\(i, _) -> lojaClicada mx my i) (zip [0 ..] (lojaJogo jogoAtual)) of
         Just (_, (preco, torre))
           | creditosBase (baseJogo jogoAtual) >= preco ->
@@ -147,7 +181,11 @@ reage (EventKey (MouseButton LeftButton) Down _ pos@(mx, my)) estado@(ImmutableT
         _ -> case torreNoClique (mx, my) jogoAtual of
           Just torre -> return estado {torreFocada = Just (posicaoTorre torre), posicaoRato = Just (mx, my)}
           Nothing -> return estado {torreFocada = Nothing, posicaoRato = Just (mx, my)}
-reage (EventKey (MouseButton LeftButton) Down _ (mx, my)) estado@(ImmutableTowers jogoAtual _ EmJogo _ (Just torre) _ _ _ _ _ _ _ _ _) =
+    Nothing ->
+      case torreNoClique (mx, my) jogoAtual of
+        Just torre -> return estado {torreFocada = Just (posicaoTorre torre), posicaoRato = Just (mx, my)}
+        Nothing -> return estado {torreFocada = Nothing, posicaoRato = Just (mx, my)}
+reage (EventKey (MouseButton LeftButton) Down _ (mx, my)) estado@ImmutableTowers {jogo = jogoAtual, modo = EmJogo, torreSelecionada = Just torre} =
   case acaoJogoClicada (mx, my) estado of
     Just novoEstado -> return novoEstado
     Nothing -> return $ colocaTorreSelecionada estado jogoAtual torre (mx, my)
@@ -165,7 +203,7 @@ apagarCaracterPerfil estado =
           nomeAtual = nomeJogador perfil
           novoPerfil = perfil {nomeJogador = if null nomeAtual then nomeAtual else init nomeAtual}
        in do
-            guardarMetaEstado novoPerfil (leaderboardLocal estado) (modoJogoEscolhido estado)
+            guardarMetaEstado novoPerfil (leaderboardLocal estado) (modoJogoEscolhido estado) (progressoMeta estado)
             return estado {perfilJogador = novoPerfil}
     _ -> return estado
 
@@ -176,9 +214,11 @@ acaoJogoClicada pos estado
   | pos `containsPoint` speed1Rect = Just (adicionaMensagem MsgInfo "Velocidade 1x" estado {velocidadeJogo = 1})
   | pos `containsPoint` speed2Rect = Just (adicionaMensagem MsgInfo "Velocidade 2x" estado {velocidadeJogo = 2})
   | pos `containsPoint` speed4Rect = Just (adicionaMensagem MsgInfo "Velocidade 4x" estado {velocidadeJogo = 4})
-  | pos `containsPoint` upgradeRect = Just (upgradeSelecionada estado (jogo estado) (torreFocada estado))
-  | pos `containsPoint` sellRect = Just (vendeTorreSelecionada estado)
-  | pos `containsPoint` cancelRect = Just estado {torreSelecionada = Nothing, torreFocada = Nothing}
+  | pos `containsPoint` hudToggleRect = Just estado {hudCompacto = not (hudCompacto estado)}
+  | pos `containsPoint` shopToggleRect = Just estado {lojaVisivel = not (lojaVisivel estado)}
+  | not (hudCompacto estado) && pos `containsPoint` upgradeRect = Just (upgradeSelecionada estado (jogo estado) (torreFocada estado))
+  | not (hudCompacto estado) && pos `containsPoint` sellRect = Just (vendeTorreSelecionada estado)
+  | not (hudCompacto estado) && pos `containsPoint` cancelRect = Just estado {torreSelecionada = Nothing, torreFocada = Nothing}
   | otherwise = Nothing
 
 acaoPausaClicada :: (Float, Float) -> ImmutableTowers -> Maybe ImmutableTowers
@@ -225,23 +265,29 @@ adicionaMensagem tipo texto estado =
 
 guardarModoSelecionado :: ImmutableTowers -> ModoJogoEscolhido -> IO ImmutableTowers
 guardarModoSelecionado e novoModo = do
-  guardarMetaEstado (perfilJogador e) (leaderboardLocal e) novoModo
+  guardarMetaEstado (perfilJogador e) (leaderboardLocal e) novoModo (progressoMeta e)
   return e {modoJogoEscolhido = novoModo}
 
 iniciarPartida :: ImmutableTowers -> ImmutableTowers
 iniciarPartida e =
-  let jogoNovo = jogoParaModo (modoJogoEscolhido e)
-   in e
-        { jogo = jogoNovo,
-          modo = EmJogo,
-          tempo = 0,
-          torreSelecionada = Nothing,
-          torreFocada = Nothing,
-          ondasSobrevividas = 0,
-          resultadoRegistado = False,
-          velocidadeJogo = 1,
-          mensagensUI = []
-        }
+  if not (GameFactory.modoDesbloqueado (progressoMeta e) (modoJogoEscolhido e))
+    then adicionaMensagem MsgAviso ("Requer nivel " ++ show (nivelMinimoModo (modoJogoEscolhido e))) e
+    else
+      let (jogoNovo, mapaId, totalOndas, metaNovo) = prepararPartida (modoJogoEscolhido e) (progressoMeta e)
+       in e
+            { jogo = jogoNovo,
+              modo = EmJogo,
+              tempo = 0,
+              torreSelecionada = Nothing,
+              torreFocada = Nothing,
+              progressoMeta = metaNovo,
+              mapaAtual = mapaId,
+              ondasSobrevividas = 0,
+              totalOndasPartida = totalOndas,
+              resultadoRegistado = False,
+              velocidadeJogo = 1,
+              mensagensUI = []
+            }
 
 upgradeSelecionada :: ImmutableTowers -> Jogo -> Maybe Posicao -> ImmutableTowers
 upgradeSelecionada estado jogoAtual foco =
@@ -303,42 +349,39 @@ atualizaIndice n f (x : xs) = x : atualizaIndice (n - 1) f xs
 
 lojaClicada :: Float -> Float -> Int -> Bool
 lojaClicada mx my indice =
-  let posX = -larguraJanela / 2 + 74 + fromIntegral indice * 82
-      posY = -alturaJanela / 2 + 72
-      largura = 72
-      altura = 104
+  let posX = -larguraJanela / 2 + 82 + fromIntegral indice * 92
+      posY = -alturaJanela / 2 + 66
+      largura = 82
+      altura = 96
    in mx >= posX - largura / 2
         && mx <= posX + largura / 2
         && my >= posY - altura / 2
         && my <= posY + altura / 2
 
 opcaoMenuClicada :: Float -> Float -> Maybe MenuInicialOpcoes
-opcaoMenuClicada mx my = fmap fst $ find (dentroBotao . snd) botoes
+opcaoMenuClicada mx my = fmap fst $ find (containsPoint (mx, my) . snd) botoes
   where
     botoes =
-      [ (Jogar, (-280, 55)),
-        (Modos, (0, 55)),
-        (Perfil, (280, 55)),
-        (Leaderboard, (-280, -105)),
-        (Creditos, (0, -105)),
-        (Opcoes, (280, -105)),
-        (Sair, (0, -255))
+      [ (Jogar, menuHeroRect),
+        (Modos, menuModeRect),
+        (LojaMeta, menuShopRect),
+        (Perfil, menuProfileRect),
+        (Leaderboard, menuLeaderboardRect),
+        (Creditos, menuHelpRect),
+        (Opcoes, menuOptionsRect),
+        (Sair, menuExitRect)
       ]
-    dentroBotao (x, y) =
-      mx >= x - 120 && mx <= x + 120 && my >= y - 59 && my <= y + 59
 
 modoClicado :: Float -> Float -> Maybe ModoJogoEscolhido
-modoClicado mx my = fmap fst $ find (dentro . snd) botoes
+modoClicado mx my = fmap fst $ find (containsPoint (mx, my) . snd) botoes
   where
     botoes =
-      [ (ModoHistoria, (-360, 90)),
-        (ModoInfinito, (0, 90)),
-        (ModoDesafio, (360, 90)),
-        (ModoBoss, (-180, -105)),
-        (ModoSandbox, (180, -105))
+      [ (ModoHistoria, modeHistoriaRect),
+        (ModoInfinito, modeInfinitoRect),
+        (ModoDesafio, modeDesafioRect),
+        (ModoBoss, modeBossRect),
+        (ModoSandbox, modeSandboxRect)
       ]
-    dentro (x, y) =
-      mx >= x - 150 && mx <= x + 150 && my >= y - 76 && my <= y + 76
 
 proximoModoJogo :: ModoJogoEscolhido -> ModoJogoEscolhido
 proximoModoJogo modoAtual = case modoAtual of
@@ -355,18 +398,3 @@ modoJogoAnterior modoAtual = case modoAtual of
   ModoDesafio -> ModoInfinito
   ModoBoss -> ModoDesafio
   ModoSandbox -> ModoBoss
-
-startWaveRect, pauseRect, speed1Rect, speed2Rect, speed4Rect, upgradeRect, sellRect, cancelRect :: UIRect
-startWaveRect = UIRect 178 500 126 42
-pauseRect = UIRect 310 500 78 42
-speed1Rect = UIRect 394 500 52 42
-speed2Rect = UIRect 452 500 52 42
-speed4Rect = UIRect 510 500 52 42
-upgradeRect = UIRect 458 (-72) 92 42
-sellRect = UIRect 458 (-122) 92 42
-cancelRect = UIRect 458 (-172) 92 42
-
-resumeRect, restartRect, menuRect :: UIRect
-resumeRect = UIRect 0 (-28) 190 52
-restartRect = UIRect 0 (-92) 190 52
-menuRect = UIRect 0 (-156) 190 52

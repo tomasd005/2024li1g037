@@ -46,11 +46,15 @@ executable immutable-towers
         GameFactory
         MapData
         MapEditor
+        MetaTypes
+        ProgressionSystem
         SaveSystem
         ScoreSystem
         Tempo
         TowerSystem
         UIComponents
+        UIRects
+        UIState
         WaveSystem
 
     main-is:          Main.hs

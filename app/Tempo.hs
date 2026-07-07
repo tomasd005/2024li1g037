@@ -4,6 +4,8 @@ import Data.List (sortOn)
 import ImmutableTowers
 import LI12425
 import MapData
+import MetaTypes
+import ProgressionSystem
 import SaveSystem
 import ScoreSystem
 import Tarefa3
@@ -48,22 +50,33 @@ adicionaOndaInfinita estado =
       jogoAtual = jogo estado
       novaOnda = criaOnda (proxima + 1) (5 + proxima) 2
       portaisAtualizados = case portaisJogo jogoAtual of
-        [] -> [portalBase {ondasPortal = [novaOnda]}]
+        [] -> [(portalPorMapa (mapaAtual estado)) {ondasPortal = [novaOnda]}]
         (portal:resto) -> portal {ondasPortal = [novaOnda]} : resto
-   in estado {jogo = jogoAtual {portaisJogo = portaisAtualizados}, ondasSobrevividas = proxima}
+   in estado {jogo = jogoAtual {portaisJogo = portaisAtualizados}, ondasSobrevividas = proxima, totalOndasPartida = proxima + 1}
 
 registaResultado :: ImmutableTowers -> IO ImmutableTowers
 registaResultado estado = do
   let ganhou = vidaBase (baseJogo (jogo estado)) > 0
       score = pontuacaoAtual estado
       perfil = perfilJogador estado
+      metaAtual = progressoMeta estado
       perfilAtualizado = perfil
         { jogosJogador = jogosJogador perfil + 1,
           vitoriasJogador = vitoriasJogador perfil + if ganhou then 1 else 0,
           derrotasJogador = derrotasJogador perfil + if ganhou then 0 else 1,
           melhorPontuacaoJogador = max (melhorPontuacaoJogador perfil) score
         }
-      entrada = Pontuacao (nomeJogador perfil) (modoJogoEscolhido estado) score (ondasSobrevividas estado)
+      metaComRecompensa
+        | not ganhou = metaAtual
+        | modoJogoEscolhido estado == ModoHistoria =
+            let baseMeta = avancaHistoria metaAtual
+             in baseMeta {gemasJogador = gemasJogador baseMeta + recompensaVitoriaModo (modoJogoEscolhido estado) metaAtual}
+        | otherwise =
+            metaAtual
+              { gemasJogador = gemasJogador metaAtual + recompensaVitoriaModo (modoJogoEscolhido estado) metaAtual,
+                nivelJogadorMeta = max (nivelJogadorMeta metaAtual) (1 + (estagiosConcluidos metaAtual + vitoriasJogador perfilAtualizado) `div` 2)
+              }
+      entrada = Pontuacao (nomeJogador perfil) (modoJogoEscolhido estado) score (max (ondasSobrevividas estado) (totalOndasPartida estado))
       leaderboardAtualizada = take 10 $ sortOn (negate . valorPontuacao) (entrada : leaderboardLocal estado)
-  guardarMetaEstado perfilAtualizado leaderboardAtualizada (modoJogoEscolhido estado)
-  return estado {perfilJogador = perfilAtualizado, leaderboardLocal = leaderboardAtualizada, resultadoRegistado = True}
+  guardarMetaEstado perfilAtualizado leaderboardAtualizada (modoJogoEscolhido estado) metaComRecompensa
+  return estado {perfilJogador = perfilAtualizado, leaderboardLocal = leaderboardAtualizada, progressoMeta = metaComRecompensa, resultadoRegistado = True}
