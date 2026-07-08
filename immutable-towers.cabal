@@ -77,9 +77,14 @@ test-suite immutable-towers-test
     type:             exitcode-stdio-1.0
 
     other-modules:
+        ImmutableTowers
+        MetaTypes
         Tarefa1Spec
         Tarefa2Spec
         Tarefa3Spec
+        UIComponents
+        UIRects
+        UILayoutSpec
 
     main-is:          Spec.hs
 
@@ -90,5 +95,5 @@ test-suite immutable-towers-test
         gloss ^>=1.13.2.1,
         immutable-towers
 
-    hs-source-dirs:   test
+    hs-source-dirs:   test, app
     default-language: GHC2021

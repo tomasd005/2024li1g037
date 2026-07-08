@@ -96,11 +96,13 @@ desenhaJogoCompleto e =
 
 desenhaInstrucoes :: ImmutableTowers -> Picture
 desenhaInstrucoes e =
-  case torreSelecionada e of
-    Nothing -> 
-      drawUITextLeft (-larguraJanela/2 + 38) (-alturaJanela/2 + 132) 2 corTextoSuave "LOJA: CLIQUE PARA COMPRAR | X ALTERNA 1X/2X/4X | H/K ESCONDEM PAINEIS"
-    Just _ ->
-      drawUITextLeft (-larguraJanela/2 + 38) (-alturaJanela/2 + 132) 2 (makeColorI 235 194 96 255) "CLIQUE NA RELVA PARA COLOCAR (BOTAO DIREITO CANCELA)"
+  if lojaVisivel e
+    then Blank
+    else case torreSelecionada e of
+      Nothing ->
+        drawGlossBody (-larguraJanela/2 + 44) (-alturaJanela/2 + 116) 0.064 corTextoSuave "Loja compra torres  |  X alterna 1x 2x 4x  |  H e K escondem paineis"
+      Just _ ->
+        drawGlossBody (-larguraJanela/2 + 44) (-alturaJanela/2 + 116) 0.066 (makeColorI 235 194 96 255) "Clique na relva para colocar  |  Botao direito cancela"
 
 -- ============================================================================
 -- DESENHO DO MENU
@@ -705,7 +707,7 @@ desenhaHUD e =
         hudPill (-308) y 154 "VAGA" ondaValor (makeColorI 226 153 76 255),
         hudPill (-130) y 154 "RESTAM" (show (inimigosRestantesUI resumo)) corTextoSuave,
         hudPill 48 y 154 "VEL" speed (makeColorI 111 150 168 255),
-        drawGlossBody 214 (y - 23) 0.074 (makeColorI 154 164 146 255) ("Mapa " ++ nomeMapa (mapaAtual e) ++ "  |  " ++ proximaTexto)
+        drawGlossBody 206 (y - 18) 0.068 (makeColorI 154 164 146 255) ("Mapa " ++ nomeMapa (mapaAtual e) ++ "  |  " ++ proximaTexto)
       ]
 
 desenhaControlesJogo :: ImmutableTowers -> Picture
@@ -764,6 +766,15 @@ desenhaPainelLateral e =
             , drawGlossBody secX (y - 118) 0.072 corTextoSuave "Escolhe uma torre do arsenal"
             , drawGlossBody secX (y - 146) 0.072 corTextoSuave "ou clica numa torre no mapa"
             ]
+      botoesPainel = case (torreAtiva, torreSel) of
+        (Just _, _) ->
+          [ drawButton (posicaoRato e) upgradeRect Primary "UPGRADE"
+          , drawButton (posicaoRato e) sellRect Danger "VENDER"
+          , drawButton (posicaoRato e) cancelRect Neutral "LIMPAR"
+          ]
+        (Nothing, Just _) ->
+          [ drawButton (posicaoRato e) cancelRect Neutral "LIMPAR" ]
+        _ -> []
    in Pictures [
         Color (withAlpha 0.94 corPainel) $ Translate x y $ rectangleSolid 300 388,
         Color (makeColorI 68 78 63 255) $ Translate x y $ rectangleWire 300 388,
@@ -773,9 +784,7 @@ desenhaPainelLateral e =
         Color (withAlpha 0.16 (makeColorI 176 184 171 255)) $ Translate x (y - 30) $ rectangleSolid 244 2,
         towerHeader,
         Pictures towerInfo,
-        drawButton (posicaoRato e) upgradeRect (maybe Disabled (const Primary) torreAtiva) "UPGRADE",
-        drawButton (posicaoRato e) sellRect (maybe Disabled (const Danger) torreAtiva) "VENDER",
-        drawButton (posicaoRato e) cancelRect Neutral "LIMPAR"
+        Pictures botoesPainel
       ]
 
 findTorreNaPosicao :: Posicao -> [Torre] -> Maybe Torre

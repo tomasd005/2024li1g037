@@ -44,8 +44,8 @@ sellRect = UIRect 772 (-116) 122 42
 cancelRect = UIRect 772 (-166) 122 42
 
 hudToggleRect, shopToggleRect :: UIRect
-hudToggleRect = UIRect 844 494 72 42
-shopToggleRect = UIRect 924 494 84 42
+hudToggleRect = UIRect 804 494 72 42
+shopToggleRect = UIRect 890 494 84 42
 
 resumeRect, restartRect, menuRect :: UIRect
 resumeRect = UIRect 0 (-28) 190 52

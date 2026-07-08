@@ -5,6 +5,7 @@ import Test.HUnit
 import Tarefa1Spec
 import Tarefa2Spec
 import Tarefa3Spec
+import UILayoutSpec
 
 testSuite :: Test
 testSuite =
@@ -15,4 +16,4 @@ testSuite =
       ]
 
 main :: IO ()
-main = runTestTTAndExit $ test [testSuite, testesTarefa1, testesTarefa2, testesTarefa3]
+main = runTestTTAndExit $ test [testSuite, testesTarefa1, testesTarefa2, testesTarefa3, testesUILayout]
