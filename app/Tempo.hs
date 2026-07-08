@@ -22,7 +22,7 @@ reageTempo segundos estado@ImmutableTowers {modo = EmJogo} =
       jogoAtualizado = atualizaJogo segundosFloat jogoAtual
       tempoNovo = tempoAtual + segundos
       mensagensAtualizadas = atualizaMensagens segundos (mensagensUI estado)
-      estadoAtualizado = estado {jogo = jogoAtualizado, tempo = tempoNovo, mensagensUI = mensagensAtualizadas}
+      estadoAtualizado = atualizaInputContinuo segundos estado {jogo = jogoAtualizado, tempo = tempoNovo, mensagensUI = mensagensAtualizadas}
       partidaLimpa = vidaBase (baseJogo jogoAtualizado) > 0
         && null (inimigosJogo jogoAtualizado)
         && all (null . inimigosOnda) (concatMap ondasPortal (portaisJogo jogoAtualizado))
@@ -31,13 +31,36 @@ reageTempo segundos estado@ImmutableTowers {modo = EmJogo} =
       else if modoAtual == ModoInfinito && partidaLimpa
         then return (adicionaOndaInfinita estadoAtualizado)
         else return estadoAtualizado
-reageTempo _ estado = return estado
+reageTempo segundos estado =
+  return $
+    atualizaInputContinuo segundos $
+      estado
+        { tempo = tempo estado + segundos,
+          mensagensUI = atualizaMensagens segundos (mensagensUI estado)
+        }
 
 atualizaMensagens :: Tempo -> [MensagemUI] -> [MensagemUI]
 atualizaMensagens segundos =
   take 4 . filter ((> 0) . tempoMensagem) . map reduz
   where
     reduz msg = msg {tempoMensagem = tempoMensagem msg - segundos}
+
+atualizaInputContinuo :: Tempo -> ImmutableTowers -> ImmutableTowers
+atualizaInputContinuo segundos estado
+  | modo estado /= MostrarPerfil = estado {backspacePerfilTimer = 0}
+  | not (backspacePerfilAtivo estado) = estado {backspacePerfilTimer = 0}
+  | null (nomeJogador (perfilJogador estado)) = estado {backspacePerfilTimer = 0}
+  | otherwise =
+      let timerNovo = backspacePerfilTimer estado - segundos
+       in if timerNovo > 0
+            then estado {backspacePerfilTimer = timerNovo}
+            else
+              let perfil = perfilJogador estado
+                  novoNome = if null (nomeJogador perfil) then "" else init (nomeJogador perfil)
+               in estado
+                    { perfilJogador = perfil {nomeJogador = novoNome},
+                      backspacePerfilTimer = 0.055
+                    }
 
 partidaTerminou :: Jogo -> Bool
 partidaTerminou jogoAtual =

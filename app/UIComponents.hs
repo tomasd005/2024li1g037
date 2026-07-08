@@ -4,8 +4,7 @@ module UIComponents
     containsPoint,
     drawButton,
     drawPanel,
-    drawLabel,
-    drawValue,
+    drawAccentBar,
   )
 where
 
@@ -39,8 +38,6 @@ drawButton mouse rect@(UIRect x y w h) tone label =
       (fillBase, borderBase, textColor) = colors tone
       fill = if hovered then brighten fillBase else fillBase
       border = if hovered then makeColorI 235 204 105 255 else borderBase
-      scaleText = min 0.105 (max 0.062 (w / max 1 (fromIntegral (length label)) / 86))
-      textWidth = fromIntegral (length label) * 104 * scaleText
    in Translate x y $
         Pictures
           [ Color fill $ rectangleSolid w h,
@@ -48,16 +45,14 @@ drawButton mouse rect@(UIRect x y w h) tone label =
             if hovered
               then Color (withAlpha 0.18 border) $ rectangleSolid (w - 8) (h - 8)
               else Blank,
-            Translate (-textWidth / 2) (-9) $ Scale scaleText scaleText $ Color textColor $ Text label
+            drawButtonLabel label w textColor
           ]
 
-drawLabel :: Float -> Float -> String -> Picture
-drawLabel x y label =
-  Translate x y $ Scale 0.062 0.062 $ Color (makeColorI 157 171 151 255) $ Text label
-
-drawValue :: Float -> Float -> String -> Color -> Picture
-drawValue x y value colorValue =
-  Translate x y $ Scale 0.105 0.105 $ Color colorValue $ Text value
+drawAccentBar :: Float -> Float -> Float -> Color -> Picture
+drawAccentBar x y w cor =
+  Color (withAlpha 0.35 cor) $
+    Translate x y $
+    rectangleSolid (w - 34) 6
 
 colors :: ButtonTone -> (Color, Color, Color)
 colors Primary = (makeColorI 67 80 48 242, makeColorI 226 194 95 255, makeColorI 238 241 229 255)
@@ -69,3 +64,14 @@ brighten :: Color -> Color
 brighten baseColor =
   let (r, g, b, a) = rgbaOfColor baseColor
    in makeColor (min 1 (r + 0.08)) (min 1 (g + 0.08)) (min 1 (b + 0.08)) a
+
+drawButtonLabel :: String -> Float -> Color -> Picture
+drawButtonLabel label buttonWidth textColor =
+  let scaleText = min 0.11 (max 0.05 (buttonWidth / max 1 (fromIntegral (length label)) / 10.8))
+      approxWidth = fromIntegral (length label) * 54 * scaleText
+      x = negate (approxWidth / 2)
+      y = -8
+   in Pictures
+        [ Translate (x + 1.5) (y - 1.5) $ Scale scaleText scaleText $ Color (withAlpha 0.22 black) $ Text label,
+          Translate x y $ Scale scaleText scaleText $ Color textColor $ Text label
+        ]

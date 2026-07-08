@@ -46,8 +46,10 @@ executable immutable-towers
         GameFactory
         MapData
         MapEditor
+        MenuComponents
         MetaTypes
         ProgressionSystem
+        RenderConfig
         SaveSystem
         ScoreSystem
         Tempo
@@ -55,6 +57,7 @@ executable immutable-towers
         UIComponents
         UIRects
         UIState
+        UIText
         WaveSystem
 
     main-is:          Main.hs

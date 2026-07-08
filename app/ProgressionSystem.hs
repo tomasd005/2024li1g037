@@ -81,7 +81,7 @@ wavesHistoria meta =
    in [criaOnda (baseNivel + deslocamento) (4 + baseNivel + deslocamento) (fromIntegral deslocamento * 2.2) | deslocamento <- [0 .. 9]]
 
 totalOndasPartidaModo :: ModoJogoEscolhido -> MetaProgress -> Int
-totalOndasPartidaModo modoAtual meta = case modoAtual of
+totalOndasPartidaModo modoAtual _ = case modoAtual of
   ModoHistoria -> 10
   ModoInfinito -> 1
   _ -> length (ondasParaModo modoAtual)

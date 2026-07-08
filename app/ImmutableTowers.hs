@@ -11,6 +11,7 @@ data ImmutableTowers = ImmutableTowers
     imagens :: Imagens,
     modo :: Modo,
     tempo :: Float,
+    janelaAtual :: (Int, Int),
     torreSelecionada :: Maybe Torre,
     torreFocada :: Maybe Posicao,
     posicaoRato :: Maybe (Float, Float),
@@ -25,7 +26,9 @@ data ImmutableTowers = ImmutableTowers
     velocidadeJogo :: Float,
     mensagensUI :: [MensagemUI],
     hudCompacto :: Bool,
-    lojaVisivel :: Bool
+    lojaVisivel :: Bool,
+    backspacePerfilAtivo :: Bool,
+    backspacePerfilTimer :: Float
   }
 
 data TipoMensagem = MsgInfo | MsgSucesso | MsgAviso | MsgErro
@@ -118,20 +121,6 @@ data Modo
   | EditorMapa
   | Pausado
   deriving (Show, Eq)
-
-getImagem :: Imagem -> Imagens -> Picture
-getImagem k d = case lookup k d of
-  Just (Just img) -> img
-  _ -> Blank
-
-getImagemOuFallback :: Imagem -> Imagens -> Picture
-getImagemOuFallback k d = case lookup k d of
-  Just (Just img) -> img
-  _ ->
-    Pictures
-      [ Color (withAlpha 0.35 red) $ rectangleSolid 32 32,
-        Color red $ rectangleWire 32 32
-      ]
 
 pixeis :: Int
 pixeis = 32

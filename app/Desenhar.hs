@@ -1,30 +1,24 @@
 module Desenhar where
 
 import Data.Maybe (fromMaybe)
+import Data.Fixed (mod')
 import GameFactory
 import Graphics.Gloss
 import Graphics.Gloss.Juicy
 import ImmutableTowers
 import LI12425
 import MapGeometry
+import MenuComponents
 import MetaTypes
 import ProgressionSystem (capituloEstagioTexto)
+import RenderConfig
 import SaveSystem
 import Tarefa2 (inimigosNoAlcance)
 import TowerSystem
 import UIComponents
 import UIRects
 import UIState
-
--- Paleta mais sóbria, inspirada em tower defenses com tabuleiro tático:
--- terreno escuro, água dessaturada, UI em painéis translúcidos.
-mapaLarguraMax, mapaAlturaMax, mapaCentroY :: Float
-mapaLarguraMax = 1280
-mapaAlturaMax = 952
-mapaCentroY = 18
-
-renderLayout :: MapLayoutConfig
-renderLayout = MapLayoutConfig mapaLarguraMax mapaAlturaMax mapaCentroY
+import UIText
 
 corFundoJogo, corPainel, corTextoSuave :: Color
 corFundoJogo = makeColorI 30 43 34 255
@@ -36,6 +30,18 @@ corRelvaBase = makeColorI 70 94 56 255
 corRelvaAlt = makeColorI 81 108 66 255
 corTerraBase = makeColorI 95 73 49 255
 corAguaBase = makeColorI 67 112 133 255
+
+layoutRender :: ImmutableTowers -> MapLayoutConfig
+layoutRender = layoutParaJanela . janelaAtual
+
+viewW :: ImmutableTowers -> Float
+viewW = fromIntegral . fst . janelaAtual
+
+viewH :: ImmutableTowers -> Float
+viewH = fromIntegral . snd . janelaAtual
+
+uiScale :: ImmutableTowers -> Float
+uiScale e = min (viewW e / larguraJanela) (viewH e / alturaJanela)
 
 -- ============================================================================
 -- FUNÇÃO PRINCIPAL DE DESENHO
@@ -62,24 +68,26 @@ desenha e = case modo e of
 desenhaJogoCompleto :: ImmutableTowers -> Picture
 desenhaJogoCompleto e =
   Pictures [
-    Color corFundoJogo $ rectangleSolid larguraJanela alturaJanela,
-    Color (makeColorI 20 28 23 232) $ Translate 0 (-alturaJanela/2 + 66) $ rectangleSolid larguraJanela 132,
-    Color (makeColorI 21 29 24 228) $ Translate 0 (alturaJanela/2 - 46) $ rectangleSolid larguraJanela 92,
+    Color corFundoJogo $ rectangleSolid (viewW e) (viewH e),
+    Scale (uiScale e) (uiScale e) $ Pictures
+      [ Color (makeColorI 20 28 23 232) $ Translate 0 (-alturaJanela/2 + 66) $ rectangleSolid larguraJanela 132,
+        Color (makeColorI 21 29 24 228) $ Translate 0 (alturaJanela/2 - 46) $ rectangleSolid larguraJanela 92,
     -- Camadas de baixo para cima
-    mapaToPicture (imagens e) (mapaJogo (jogo e)),
-    desenhaPreVisualizacaoColocacao e,
-    desenhaTorres e,
-    desenhaInimigosComEfeitos e,
-    desenhaProjeteis e,
-    desenhaPortais e,
-    desenhaBase e (baseJogo (jogo e)),
-    desenhaHUD e,
-    desenhaControlesJogo e,
-    if hudCompacto e then Blank else desenhaPainelLateral e,
-    if lojaVisivel e then desenhaLoja e else Blank,
-    desenhaMensagens e,
-    desenhaGameOver e,
-    if hudCompacto e then Blank else desenhaInstrucoes e
+        mapaToPicture (layoutRender e) (imagens e) (mapaJogo (jogo e)),
+        desenhaPreVisualizacaoColocacao e,
+        desenhaTorres e,
+        desenhaInimigosComEfeitos e,
+        desenhaProjeteis e,
+        desenhaPortais e,
+        desenhaBase e (baseJogo (jogo e)),
+        desenhaHUD e,
+        desenhaControlesJogo e,
+        if hudCompacto e then Blank else desenhaPainelLateral e,
+        if lojaVisivel e then desenhaLoja e else Blank,
+        desenhaMensagens e,
+        desenhaGameOver e,
+        if hudCompacto e then Blank else desenhaInstrucoes e
+      ]
   ]
 
 -- ============================================================================
@@ -90,13 +98,9 @@ desenhaInstrucoes :: ImmutableTowers -> Picture
 desenhaInstrucoes e =
   case torreSelecionada e of
     Nothing -> 
-      Translate (-larguraJanela/2 + 38) (-alturaJanela/2 + 132) $
-      Scale 0.08 0.08 $ Color corTextoSuave $ 
-      Text "Loja: clique para comprar | X alterna 1x/2x/4x | H/K escondem paineis"
+      drawUITextLeft (-larguraJanela/2 + 38) (-alturaJanela/2 + 132) 2 corTextoSuave "LOJA: CLIQUE PARA COMPRAR | X ALTERNA 1X/2X/4X | H/K ESCONDEM PAINEIS"
     Just _ ->
-      Translate (-larguraJanela/2 + 38) (-alturaJanela/2 + 132) $
-      Scale 0.08 0.08 $ Color (makeColorI 235 194 96 255) $ 
-      Text "Clique na RELVA para colocar (Botao direito cancela)"
+      drawUITextLeft (-larguraJanela/2 + 38) (-alturaJanela/2 + 132) 2 (makeColorI 235 194 96 255) "CLIQUE NA RELVA PARA COLOCAR (BOTAO DIREITO CANCELA)"
 
 -- ============================================================================
 -- DESENHO DO MENU
@@ -105,64 +109,37 @@ desenhaInstrucoes e =
 desenhaMenu :: ImmutableTowers -> MenuInicialOpcoes -> Picture
 desenhaMenu e opcaoSel =
   Pictures [
-    Color corFundoJogo $ rectangleSolid larguraJanela alturaJanela,
-    Color (withAlpha 0.3 (makeColorI 40 52 43 255)) $ Translate 0 78 $ rectangleSolid 960 650,
-    Color (makeColorI 68 78 63 255) $ Translate 0 78 $ rectangleWire 960 650,
-    Translate (-360) 300 $ Scale 0.42 0.42 $ Color corTextoSuave $ Text "IMMUTABLE",
-    Translate (-286) 242 $ Scale 0.42 0.42 $ Color (makeColorI 226 194 95 255) $ Text "TOWERS",
-    Translate (-360) 176 $ Scale 0.105 0.105 $ Color (makeColorI 154 164 146 255) $
-      Text "Defende a base, evolui torres e compete por pontuacao.",
-    Translate (-360) 140 $ Scale 0.09 0.09 $ Color corTextoSuave $
-      Text ("Perfil: " ++ nomeJogador (perfilJogador e) ++ "   |   Modo: " ++ nomeModoJogo (modoJogoEscolhido e)),
-    heroCard menuHeroRect (opcaoSel == Jogar) "JOGAR" "Entra logo na partida atual",
-    heroCard menuModeRect (opcaoSel == Modos) "MODOS" "Escolhe mapa, ritmo e desafio",
-    utilityCard menuShopRect (opcaoSel == LojaMeta) "LOJA",
-    utilityCard menuProfileRect (opcaoSel == Perfil) "PERFIL",
-    utilityCard menuLeaderboardRect (opcaoSel == Leaderboard) "RANKING",
-    utilityCard menuHelpRect (opcaoSel == Creditos) "AJUDA",
-    utilityCard menuOptionsRect (opcaoSel == Opcoes) "OPCOES",
-    utilityCard menuExitRect (opcaoSel == Sair) "SAIR",
-    painelResumoMenu e,
-    Translate (-360) (-300) $ Scale 0.098 0.098 $ Color (makeColorI 154 164 146 255) $
-      Text "Enter confirma | Setas navegam | E abre editor de mapa"
+    Color (makeColorI 18 28 24 255) $ rectangleSolid (viewW e) (viewH e),
+    desenhaFundoAnimado e,
+    Scale (uiScale e) (uiScale e) $ Pictures
+      [ Color (withAlpha 0.5 (makeColorI 20 28 24 255)) $ Translate (-520) (-20) $ rectangleSolid 332 760,
+        Color (makeColorI 73 87 74 255) $ Translate (-520) (-20) $ rectangleWire 332 760,
+        drawGlossTitle (-635) 286 0.2 corTextoSuave "IMMUTABLE",
+        drawGlossTitle (-597) 236 0.2 (makeColorI 226 194 95 255) "TOWERS",
+        drawSidebarButton (posicaoRato e) menuHeroRect (opcaoSel == Jogar) "Jogar" "Entrar na partida",
+        drawSidebarButton (posicaoRato e) menuModeRect (opcaoSel == Modos) "Modos" "Escolher desafio",
+        drawSidebarButton (posicaoRato e) menuShopRect (opcaoSel == LojaMeta) "Loja" "Baús e gemas",
+        drawSidebarButton (posicaoRato e) menuProfileRect (opcaoSel == Perfil) "Perfil" "Progressão local",
+        drawSidebarButton (posicaoRato e) menuLeaderboardRect (opcaoSel == Leaderboard) "Ranking" "Melhores scores",
+        drawSidebarButton (posicaoRato e) menuHelpRect (opcaoSel == Creditos) "Ajuda" "Como jogar",
+        drawSidebarButton (posicaoRato e) menuOptionsRect (opcaoSel == Opcoes) "Opções" "Controlos e sistema",
+        drawSidebarButton (posicaoRato e) menuExitRect (opcaoSel == Sair) "Sair" "Fechar o jogo",
+        painelResumoMenu e,
+        drawGlossBody (-634) (-446) 0.072 (makeColorI 180 188 174 255) ("Perfil: " ++ nomeJogador (perfilJogador e)),
+        drawGlossBody (-634) (-474) 0.072 (makeColorI 180 188 174 255) ("Modo: " ++ nomeModoJogo (modoJogoEscolhido e)),
+        drawTituloMenu (-152) 254 "Immutable" "Towers",
+        drawSubtituloMenu (-152) 172 "Defende a base, evolui torres e compete por pontuacao.",
+        drawBodyText (-152) 116 ("Campanha: " ++ capituloEstagioTexto (progressoMeta e)),
+        drawBodyText (-152) 82 ("Nivel " ++ show (nivelJogadorMeta (progressoMeta e)) ++ " | " ++ show (gemasJogador (progressoMeta e)) ++ " gemas"),
+        drawBodyText (-152) 48 ("Mapa atual: " ++ nomeMapa (mapaAtual e)),
+        drawBodyText (-152) 14 ("Torres desbloqueadas: " ++ show (length (torresDesbloqueadas (progressoMeta e)))),
+        drawSubtituloMenu (-152) (-56) "Enter confirma | Setas navegam | E abre editor de mapa",
+        desenhaMensagens e
+      ]
   ]
-  where
-    heroCard rect selecionado titulo subtitulo =
-      let UIRect x y w h = rect
-          corBorda = if selecionado then makeColorI 226 194 95 255 else makeColorI 92 103 88 255
-          corFundo = if selecionado then makeColorI 55 60 45 235 else makeColorI 31 39 33 225
-       in Pictures [
-            Color corFundo $ Translate x y $ rectangleSolid w h,
-            Color corBorda $ Translate x y $ rectangleWire w h,
-            if selecionado then Color (withAlpha 0.35 corBorda) $ Translate x (y + h / 2 - 8) $ rectangleSolid (w - 34) 6 else Blank,
-            Translate (x - w / 2 + 28) (y + 12) $ Scale 0.18 0.18 $ Color corTextoSuave $ Text titulo,
-            Translate (x - w / 2 + 28) (y - 25) $ Scale 0.072 0.072 $ Color (makeColorI 154 164 146 255) $ Text subtitulo
-          ]
-    utilityCard rect selecionado titulo =
-      drawButton (posicaoRato e) rect (if selecionado then Primary else Neutral) titulo
 
 painelResumoMenu :: ImmutableTowers -> Picture
-painelResumoMenu e =
-  let x = 224
-      y = 210
-      linhas =
-        [ capituloEstagioTexto (progressoMeta e),
-          "Nivel " ++ show (nivelJogadorMeta (progressoMeta e)) ++ " | " ++ show (gemasJogador (progressoMeta e)) ++ " gemas",
-          "Mapa rotativo: " ++ nomeMapa (mapaAtual e),
-          "Torres desbloqueadas: " ++ show (length (torresDesbloqueadas (progressoMeta e)))
-        ]
-   in Pictures
-        [ Color (withAlpha 0.9 corPainel) $ Translate x y $ rectangleSolid 340 236,
-          Color (makeColorI 68 78 63 255) $ Translate x y $ rectangleWire 340 236,
-          Translate (x - 136) (y + 70) $ Scale 0.125 0.125 $ Color (makeColorI 226 194 95 255) $ Text "RESUMO",
-          Pictures
-            [ Translate (x - 136) (y + 26 - fromIntegral i * 40) $
-                Scale 0.082 0.082 $
-                Color corTextoSuave $
-                Text ("+ " ++ linha)
-              | (i, linha) <- zip [0 :: Int ..] linhas
-            ]
-        ]
+painelResumoMenu _ = Blank
 
 desenhaTutorial :: Picture
 desenhaTutorial = desenhaPainelTexto "TUTORIAL" [
@@ -213,34 +190,42 @@ desenhaLeaderboard e =
 desenhaSelecionarModo :: ImmutableTowers -> Picture
 desenhaSelecionarModo e =
   Pictures [
-    Color corFundoJogo $ rectangleSolid larguraJanela alturaJanela,
-    Translate (-430) 300 $ Scale 0.32 0.32 $ Color (makeColorI 226 194 95 255) $ Text "MODOS",
-    Translate (-430) 258 $ Scale 0.095 0.095 $ Color corTextoSuave $
-      Text ("Atual: " ++ nomeModoJogo (modoJogoEscolhido e) ++ " | Clique num modo ou usa esquerda/direita"),
-    modoCard e ModoHistoria (-360) 90 "HISTORIA" "capitulos com 5 estagios" "10 ondas por estagio",
-    modoCard e ModoInfinito 0 90 "INFINITO" "ondas geradas sem fim" ("requer nivel " ++ show (nivelMinimoModo ModoInfinito)),
-    modoCard e ModoDesafio 360 90 "DESAFIO" "ondas fortes mais cedo" ("requer nivel " ++ show (nivelMinimoModo ModoDesafio)),
-    modoCard e ModoBoss (-180) (-105) "BOSS" "chefes e picos de dano" ("requer nivel " ++ show (nivelMinimoModo ModoBoss)),
-    modoCard e ModoSandbox 180 (-105) "SANDBOX" "testar builds e upgrades" ("requer nivel " ++ show (nivelMinimoModo ModoSandbox)),
-    Translate (-250) (-310) $ Scale 0.1 0.1 $ Color (makeColorI 154 164 146 255) $ Text "ENTER volta ao menu | modos bloqueados pedem nivel"
+    Color (makeColorI 18 28 24 255) $ rectangleSolid (viewW e) (viewH e),
+    desenhaFundoAnimado e,
+    Scale (uiScale e) (uiScale e) $ Pictures
+      [ drawTituloMenu (-436) 298 "Modos" "",
+        drawSubtituloMenu (-430) 226 ("Atual: " ++ nomeModoJogo (modoJogoEscolhido e) ++ " | Esquerda/direita ou clique"),
+        modoCard e ModoHistoria (-360) 90 "HISTORIA" "CAPITULOS COM 5 ESTAGIOS" "10 ONDAS POR ESTAGIO",
+        modoCard e ModoInfinito 0 90 "INFINITO" "ONDAS GERADAS SEM FIM" ("REQUER NIVEL " ++ show (nivelMinimoModo ModoInfinito)),
+        modoCard e ModoDesafio 360 90 "DESAFIO" "ONDAS FORTES MAIS CEDO" ("REQUER NIVEL " ++ show (nivelMinimoModo ModoDesafio)),
+        modoCard e ModoBoss (-180) (-105) "BOSS" "CHEFES E PICOS DE DANO" ("REQUER NIVEL " ++ show (nivelMinimoModo ModoBoss)),
+        modoCard e ModoSandbox 180 (-105) "SANDBOX" "TESTAR BUILDS E UPGRADES" ("REQUER NIVEL " ++ show (nivelMinimoModo ModoSandbox)),
+        drawButton (posicaoRato e) (UIRect 0 (-312) 150 48) Neutral "ESC",
+        desenhaMensagens e
+      ]
   ]
 
 desenhaOpcoes :: ImmutableTowers -> Picture
 desenhaOpcoes e =
   let rato = posicaoRato e
    in Pictures [
-        Color corFundoJogo $ rectangleSolid larguraJanela alturaJanela,
-        drawPanel (UIRect 0 40 820 590),
-        Translate (-335) 270 $ Scale 0.3 0.3 $ Color (makeColorI 226 194 95 255) $ Text "OPCOES",
-        Translate (-335) 214 $ Scale 0.095 0.095 $ Color corTextoSuave $ Text "Interface otimizada para 1920x1080 (Full HD)",
-        Translate (-335) 156 $ Scale 0.095 0.095 $ Color corTextoSuave $ Text "Controlos principais:",
-        Translate (-335) 102 $ Scale 0.083 0.083 $ Color (makeColorI 190 201 180 255) $ Text "Mouse: comprar, construir, selecionar, melhorar e vender torres",
-        Translate (-335) 58 $ Scale 0.083 0.083 $ Color (makeColorI 190 201 180 255) $ Text "P pausa | X alterna 1x/2x/4x | S/L guarda/carrega | B sugestao bot",
-        Translate (-335) 4 $ Scale 0.083 0.083 $ Color (makeColorI 190 201 180 255) $ Text "H recolhe HUD | K esconde loja | E abre editor de mapa | ESC volta",
-        Translate (-335) (-76) $ Scale 0.095 0.095 $ Color corTextoSuave $ Text "Distribuicao:",
-        Translate (-335) (-126) $ Scale 0.078 0.078 $ Color (makeColorI 190 201 180 255) $ Text "Assets atuais em app/imagens. Para release: copiar exe + pasta app/imagens.",
-        Translate (-335) (-166) $ Scale 0.078 0.078 $ Color (makeColorI 190 201 180 255) $ Text "Windows: cabal build -O2 e empacotar dist-newstyle exe com DLLs necessarias.",
-        drawButton rato (UIRect 0 (-245) 180 48) Neutral "ENTER / ESC"
+        Color (makeColorI 18 28 24 255) $ rectangleSolid (viewW e) (viewH e),
+        desenhaFundoAnimado e,
+        Scale (uiScale e) (uiScale e) $
+          Pictures
+            [ drawPanel (UIRect 0 40 820 590),
+              drawTituloMenu (-336) 290 "Opções" "",
+              drawSubtituloMenu (-335) 220 "Interface adaptada a diferentes tamanhos de janela",
+              drawSectionText (-335) 162 "CONTROLOS PRINCIPAIS",
+              drawBodyText (-335) 118 "Mouse: comprar, construir, selecionar, melhorar e vender torres",
+              drawBodyText (-335) 80 "P pausa | X alterna 1x/2x/4x | S/L guarda e carrega | B sugestão bot",
+              drawBodyText (-335) 42 "H recolhe HUD | K esconde loja | E abre editor | ESC volta",
+              drawSectionText (-335) (-24) "DISTRIBUIÇÃO",
+              drawBodyText (-335) (-66) "Assets em app/imagens. Release = exe + pasta app/imagens.",
+              drawBodyText (-335) (-104) "Windows: cabal build e empacotar executável com as DLLs necessárias.",
+              drawButton rato (UIRect 0 (-245) 150 48) Neutral "ESC",
+              desenhaMensagens e
+            ]
       ]
 
 desenhaLojaMeta :: ImmutableTowers -> Picture
@@ -254,15 +239,17 @@ desenhaLojaMeta e =
         [ Color corFundoJogo $ rectangleSolid larguraJanela alturaJanela,
           Color (withAlpha 0.96 corPainel) $ rectangleSolid 920 620,
           Color (makeColorI 68 78 63 255) $ rectangleWire 920 620,
-          Translate (-380) 248 $ Scale 0.31 0.31 $ Color (makeColorI 226 194 95 255) $ Text "LOJA",
-          Translate (-380) 198 $ Scale 0.1 0.1 $ Color corTextoSuave $ Text ("Gemas: " ++ show (gemasJogador meta) ++ "   Nivel: " ++ show (nivelJogadorMeta meta)),
-          Translate (-380) 138 $ Scale 0.11 0.11 $ Color corTextoSuave $ Text "Baus",
-          Translate (-380) 88 $ Scale 0.082 0.082 $ Color (makeColorI 190 201 180 255) $ Text ("1 Madeira " ++ show (custoBau BauMadeira) ++ " | 2 Cristal " ++ show (custoBau BauCristal) ++ " | 3 Imperial " ++ show (custoBau BauImperial)),
-          Translate (-380) 16 $ Scale 0.11 0.11 $ Color corTextoSuave $ Text "Colecao",
-          Translate (-380) (-38) $ Scale 0.076 0.076 $ Color (makeColorI 190 201 180 255) $ Text torresTexto,
-          Translate (-380) (-118) $ Scale 0.11 0.11 $ Color corTextoSuave $ Text "Fusao",
-          Translate (-380) (-170) $ Scale 0.08 0.08 $ Color (makeColorI 226 194 95 255) $ Text "F tecla: Tesla + Solar + 180 gemas -> Tempestade",
-          Translate (-278) (-260) $ Scale 0.1 0.1 $ Color (makeColorI 154 164 146 255) $ Text "1/2/3 abrem baus | F funde | ESC / ENTER volta"
+          drawGlossTitle (-380) 266 0.28 (makeColorI 226 194 95 255) "LOJA",
+          drawGlossBody (-380) 214 0.11 corTextoSuave ("GEMAS: " ++ show (gemasJogador meta) ++ " | NIVEL: " ++ show (nivelJogadorMeta meta)),
+          drawGlossTitle (-380) 150 0.14 corTextoSuave "BAUS",
+          drawGlossBody (-380) 102 0.084 (makeColorI 190 201 180 255) ("1 MADEIRA " ++ show (custoBau BauMadeira) ++ " | 2 CRISTAL " ++ show (custoBau BauCristal) ++ " | 3 IMPERIAL " ++ show (custoBau BauImperial)),
+          drawGlossTitle (-380) 30 0.14 corTextoSuave "COLECAO",
+          drawGlossBody (-380) (-24) 0.078 (makeColorI 190 201 180 255) torresTexto,
+          drawGlossTitle (-380) (-106) 0.14 corTextoSuave "FUSAO",
+          drawGlossBody (-380) (-154) 0.082 (makeColorI 226 194 95 255) "F TECLA: TESLA + SOLAR + 180 GEMAS = TEMPESTADE",
+          drawButton (posicaoRato e) (UIRect 0 (-258) 150 48) Neutral "ESC",
+          drawGlossBody (-276) (-210) 0.078 (makeColorI 154 164 146 255) "1/2/3 ABREM BAUS | F FUNDE",
+          desenhaMensagens e
         ]
 
 modoCard :: ImmutableTowers -> ModoJogoEscolhido -> Float -> Float -> String -> String -> String -> Picture
@@ -280,39 +267,91 @@ modoCard e modoCardAtual x y titulo desc regras =
    in Translate x y $ Pictures [
         Color fundo $ rectangleSolid 300 152,
         Color borda $ rectangleWire 300 152,
-        if selecionado then Color (withAlpha 0.35 borda) $ Translate 0 70 $ rectangleSolid 270 6 else Blank,
-        Translate (-120) 34 $ Scale 0.15 0.15 $ Color corTextoSuave $ Text titulo,
-        Translate (-120) (-8) $ Scale 0.071 0.071 $ Color (makeColorI 190 201 180 255) $ Text desc,
-        Translate (-120) (-42) $ Scale 0.069 0.069 $ Color (if desbloqueado then makeColorI 226 194 95 255 else makeColorI 190 82 72 255) $ Text regras,
+        if selecionado then drawAccentBar 0 70 300 borda else Blank,
+        drawGlossTitle (-118) 34 0.16 corTextoSuave titulo,
+        drawGlossBody (-118) (-2) 0.072 (makeColorI 190 201 180 255) desc,
+        drawGlossBody (-118) (-34) 0.066 (if desbloqueado then makeColorI 226 194 95 255 else makeColorI 190 82 72 255) regras,
         if modoCardAtual == ModoHistoria
-          then Translate (-120) (-66) $ Scale 0.062 0.062 $ Color corTextoSuave $ Text (capituloEstagioTexto (progressoMeta e))
+          then drawGlossBody (-118) (-60) 0.058 corTextoSuave (capituloEstagioTexto (progressoMeta e))
           else Blank
       ]
+
+desenhaFundoAnimado :: ImmutableTowers -> Picture
+desenhaFundoAnimado e =
+  let t = tempo e
+      chuva =
+        [ let px = fromIntegral (((i * 173) `mod` 1600) - 800)
+              py = fromIntegral (((i * 97) `mod` 900) - 450)
+              dy = (t * fromIntegral (18 + (i `mod` 9))) - fromIntegral ((i * 61) `mod` 900)
+              y = py + realToFrac (mod' dy 900) - 450
+              alpha = 0.05 + fromIntegral (i `mod` 4) * 0.02
+           in Color (withAlpha alpha (makeColorI 196 210 182 255)) $
+                Translate px y $
+                rectangleSolid 2 24
+        | i <- [0 :: Int .. 22]
+        ]
+      brilhos =
+        [ Color (withAlpha 0.07 (makeColorI 88 120 102 255)) $
+            Translate (220 + fromIntegral n * 40) (120 + sin (t * 0.42 + fromIntegral n) * 24) $
+            rectangleSolid 520 78
+        | n <- [0 :: Int .. 1]
+        ]
+      pulse = 56 + 8 * sin (t * 0.8)
+   in Pictures
+        [ Color (withAlpha 0.05 (makeColorI 226 194 95 255)) $ Translate 250 110 $ ThickCircle pulse 10
+        , Color (withAlpha 0.04 (makeColorI 128 168 210 255)) $ Translate 390 (-70) $ ThickCircle (pulse * 0.78) 8
+        , Pictures brilhos
+        , Pictures chuva
+        ]
+
+drawTituloMenu :: Float -> Float -> String -> String -> Picture
+drawTituloMenu x y linha1 linha2 =
+  Pictures
+    [ drawGlossTitle x y 0.36 corTextoSuave linha1,
+      if null linha2 then Blank else drawGlossTitle (x + 78) (y - 62) 0.36 (makeColorI 226 194 95 255) linha2
+    ]
+
+drawSubtituloMenu :: Float -> Float -> String -> Picture
+drawSubtituloMenu x y =
+  drawGlossBody x y 0.105 (makeColorI 172 181 167 255)
+
+drawSectionText :: Float -> Float -> String -> Picture
+drawSectionText x y =
+  drawGlossTitle x y 0.12 corTextoSuave
+
+drawBodyText :: Float -> Float -> String -> Picture
+drawBodyText x y =
+  drawGlossBody x y 0.082 (makeColorI 198 205 192 255)
+
+drawGlossTitle :: Float -> Float -> Float -> Color -> String -> Picture
+drawGlossTitle x y s c txt =
+  Pictures
+    [ Translate (x + 2) (y - 2) $ Scale s s $ Color (withAlpha 0.28 black) $ Text txt,
+      Translate x y $ Scale s s $ Color c $ Text txt
+    ]
+
+drawGlossBody :: Float -> Float -> Float -> Color -> String -> Picture
+drawGlossBody x y s c txt =
+  Pictures
+    [ Translate (x + 1.5) (y - 1.5) $ Scale s s $ Color (withAlpha 0.22 black) $ Text txt,
+      Translate x y $ Scale s s $ Color c $ Text txt
+    ]
 
 desenhaEditorMapa :: ImmutableTowers -> Picture
 desenhaEditorMapa e =
   Pictures [
-    Color corFundoJogo $ rectangleSolid larguraJanela alturaJanela,
-    mapaToPicture (imagens e) (mapaJogo (jogo e)),
-    Translate (-larguraJanela/2 + 44) (alturaJanela/2 - 54) $
-      Scale 0.13 0.13 $ Color (makeColorI 226 194 95 255) $ Text "EDITOR DE MAPA",
-    Translate (-larguraJanela/2 + 44) (alturaJanela/2 - 86) $
-      Scale 0.09 0.09 $ Color corTextoSuave $ Text "Clique numa celula: relva -> terra -> asfalto -> agua. ENTER/ESC volta."
+    Color corFundoJogo $ rectangleSolid (viewW e) (viewH e),
+    mapaToPicture (layoutRender e) (imagens e) (mapaJogo (jogo e)),
+    drawUITextLeft (-larguraJanela/2 + 44) (alturaJanela/2 - 40) 3 (makeColorI 226 194 95 255) "EDITOR DE MAPA",
+    drawUITextLeft (-larguraJanela/2 + 44) (alturaJanela/2 - 74) 2 corTextoSuave "CLIQUE NUMA CELULA: RELVA -> TERRA -> ASFALTO -> AGUA. ESC VOLTA."
   ]
 
 desenhaPainelTexto :: String -> [String] -> Picture
 desenhaPainelTexto titulo linhas =
   Pictures [
     Color corFundoJogo $ rectangleSolid larguraJanela alturaJanela,
-    Color (withAlpha 0.96 corPainel) $ rectangleSolid 860 590,
-    Color (makeColorI 68 78 63 255) $ rectangleWire 860 590,
-    Color (withAlpha 0.25 (makeColorI 226 194 95 255)) $ Translate 0 252 $ rectangleSolid 780 8,
-    Translate (-338) 224 $ Scale 0.33 0.33 $ Color (makeColorI 226 194 95 255) $ Text titulo,
-    Pictures [
-      Translate (-338) (128 - fromIntegral i * 52) $ Scale 0.105 0.105 $ Color corTextoSuave $ Text linha
-      | (i, linha) <- zip [0 :: Int ..] linhas
-    ],
-    Translate (-160) (-230) $ Scale 0.1 0.1 $ Color (makeColorI 154 164 146 255) $ Text "ESC / ENTER para voltar"
+    drawModalPanel 860 590 titulo linhas,
+    drawButton Nothing (UIRect 0 (-236) 150 48) Neutral "ESC"
   ]
 
 -- ============================================================================
@@ -325,9 +364,10 @@ desenhaTorres e =
 
 desenhaTorreCompleta :: ImmutableTowers -> Torre -> [Picture]
 desenhaTorreCompleta e torre =
-  let alcance = desenhaAlcanceTorre (mapaJogo (jogo e)) torre (torreSelecionada e)
+  let cfg = layoutRender e
+      alcance = desenhaAlcanceTorre cfg (mapaJogo (jogo e)) torre (torreSelecionada e)
       sprite = desenhaTorreSprite e torre
-      cooldown = desenhaCooldownTorre (mapaJogo (jogo e)) torre
+      cooldown = desenhaCooldownTorre cfg (mapaJogo (jogo e)) torre
       foco = if torreFocada e == Just (posicaoTorre torre)
              then desenhaFocoTorre e torre
              else Blank
@@ -335,16 +375,17 @@ desenhaTorreCompleta e torre =
 
 desenhaFocoTorre :: ImmutableTowers -> Torre -> Picture
 desenhaFocoTorre e torre =
-  let bloco = calculaTamanhoBloco (mapaJogo (jogo e))
-      (posX, posY) = posicaoMapaParaEcra (mapaJogo (jogo e)) (posicaoTorre torre)
+  let cfg = layoutRender e
+      bloco = calculaTamanhoBloco cfg (mapaJogo (jogo e))
+      (posX, posY) = posicaoMapaParaEcra cfg (mapaJogo (jogo e)) (posicaoTorre torre)
    in Color (makeColorI 226 194 95 255) $
         Translate posX posY $
         ThickCircle (bloco * 0.34) 3
 
-desenhaAlcanceTorre :: Mapa -> Torre -> Maybe Torre -> Picture
-desenhaAlcanceTorre mapa torre torreSel =
-  let raio = alcanceTorre torre * calculaTamanhoBloco mapa
-      (posX, posY) = posicaoMapaParaEcra mapa (posicaoTorre torre)
+desenhaAlcanceTorre :: MapLayoutConfig -> Mapa -> Torre -> Maybe Torre -> Picture
+desenhaAlcanceTorre cfg mapa torre torreSel =
+  let raio = alcanceTorre torre * calculaTamanhoBloco cfg mapa
+      (posX, posY) = posicaoMapaParaEcra cfg mapa (posicaoTorre torre)
       -- Mostra alcance só se torre estiver selecionada
       alpha = case torreSel of
                 Just t | posicaoTorre t == posicaoTorre torre -> 0.4
@@ -357,10 +398,10 @@ desenhaPreVisualizacaoColocacao :: ImmutableTowers -> Picture
 desenhaPreVisualizacaoColocacao e =
   case (torreSelecionada e, posicaoRato e) of
     (Just torre, Just rato) ->
-      case ratoParaCelula (mapaJogo (jogo e)) rato of
+      case ratoParaCelula (layoutRender e) (mapaJogo (jogo e)) rato of
         Just (cx, cy, centroX, centroY) ->
           let mapa = mapaJogo (jogo e)
-              bloco = calculaTamanhoBloco mapa
+              bloco = calculaTamanhoBloco (layoutRender e) mapa
               posCentro = (fromIntegral cx + 0.5, fromIntegral cy + 0.5)
               terrenoValido = terrenoEm cx cy mapa == Just Relva
               livre = notElem posCentro (map posicaoTorre (torresJogo (jogo e)))
@@ -385,8 +426,9 @@ desenhaPreVisualizacaoColocacao e =
 
 desenhaTorreSprite :: ImmutableTowers -> Torre -> Picture
 desenhaTorreSprite e torre =
-  let bloco = calculaTamanhoBloco (mapaJogo (jogo e))
-      (posX, posY) = posicaoMapaParaEcra (mapaJogo (jogo e)) (posicaoTorre torre)
+  let cfg = layoutRender e
+      bloco = calculaTamanhoBloco cfg (mapaJogo (jogo e))
+      (posX, posY) = posicaoMapaParaEcra cfg (mapaJogo (jogo e)) (posicaoTorre torre)
    in Translate posX posY $ modeloTorre bloco (projetilTorre torre) False
 
 modeloTorre :: Float -> Projetil -> Bool -> Picture
@@ -435,9 +477,9 @@ modeloTorre bloco projetil selecionada =
       ]
 
 -- Barra de cooldown acima da torre
-desenhaCooldownTorre :: Mapa -> Torre -> Picture
-desenhaCooldownTorre mapa torre =
-  let (posX, posYBase) = posicaoMapaParaEcra mapa (posicaoTorre torre)
+desenhaCooldownTorre :: MapLayoutConfig -> Mapa -> Torre -> Picture
+desenhaCooldownTorre cfg mapa torre =
+  let (posX, posYBase) = posicaoMapaParaEcra cfg mapa (posicaoTorre torre)
       progresso = max 0 (1 - (tempoTorre torre / cicloTorre torre))
       largura = 30 * progresso
       posY = posYBase + 25
@@ -457,15 +499,17 @@ desenhaInimigosComEfeitos e =
 
 desenhaInimigoComEfeitos :: ImmutableTowers -> Inimigo -> Picture
 desenhaInimigoComEfeitos e inimigo =
-  let sprite = desenhaInimigoSprite e inimigo
+  let cfg = layoutRender e
+      sprite = desenhaInimigoSprite e inimigo
       efeitos = desenhaEfeitosInimigo e inimigo
-      vidaBar = desenhaBarraVida (mapaJogo (jogo e)) inimigo
+      vidaBar = desenhaBarraVida cfg (mapaJogo (jogo e)) inimigo
    in Pictures [sprite, efeitos, vidaBar]
 
 desenhaInimigoSprite :: ImmutableTowers -> Inimigo -> Picture
 desenhaInimigoSprite e inimigo =
-  let bloco = calculaTamanhoBloco (mapaJogo (jogo e))
-      (posX, posY) = posicaoMapaParaEcra (mapaJogo (jogo e)) (posicaoInimigo inimigo)
+  let cfg = layoutRender e
+      bloco = calculaTamanhoBloco cfg (mapaJogo (jogo e))
+      (posX, posY) = posicaoMapaParaEcra cfg (mapaJogo (jogo e)) (posicaoInimigo inimigo)
    in Translate posX posY $ modeloInimigo bloco
 
 modeloInimigo :: Float -> Picture
@@ -486,8 +530,9 @@ modeloInimigo bloco =
 -- Efeitos visuais de projéteis ativos
 desenhaEfeitosInimigo :: ImmutableTowers -> Inimigo -> Picture
 desenhaEfeitosInimigo e inimigo =
-  let bloco = calculaTamanhoBloco (mapaJogo (jogo e))
-      (posX, posY) = posicaoMapaParaEcra (mapaJogo (jogo e)) (posicaoInimigo inimigo)
+  let cfg = layoutRender e
+      bloco = calculaTamanhoBloco cfg (mapaJogo (jogo e))
+      (posX, posY) = posicaoMapaParaEcra cfg (mapaJogo (jogo e)) (posicaoInimigo inimigo)
       projeteis = projeteisInimigo inimigo
       
       -- Efeito de fogo (chamas)
@@ -532,9 +577,9 @@ desenhaEfeitosInimigo e inimigo =
    in Pictures [efeitoFogo, efeitoGelo, efeitoResina, efeitoMedo, efeitoVeneno, efeitoEletrico]
 
 -- Barra de vida acima do inimigo
-desenhaBarraVida :: Mapa -> Inimigo -> Picture
-desenhaBarraVida mapa inimigo =
-  let (posX, posYBase) = posicaoMapaParaEcra mapa (posicaoInimigo inimigo)
+desenhaBarraVida :: MapLayoutConfig -> Mapa -> Inimigo -> Picture
+desenhaBarraVida cfg mapa inimigo =
+  let (posX, posYBase) = posicaoMapaParaEcra cfg mapa (posicaoInimigo inimigo)
       -- Assume vida máxima de 100 (ajustar se necessário)
       vidaMax = vidaMaxInimigoEstimado inimigo
       percentualVida = max 0 (min 1 (vidaInimigo inimigo / vidaMax))
@@ -564,13 +609,14 @@ desenhaProjeteisdeTorre e torre =
   if tempoTorre torre > cicloTorre torre * 0.8
   then
     let inimigosAlvo = take (rajadaTorre torre) (inimigosNoAlcance torre (inimigosJogo (jogo e)))
-     in map (desenhaProjetil (mapaJogo (jogo e)) torre) inimigosAlvo
+        cfg = layoutRender e
+     in map (desenhaProjetil cfg (mapaJogo (jogo e)) torre) inimigosAlvo
   else []
 
-desenhaProjetil :: Mapa -> Torre -> Inimigo -> Picture
-desenhaProjetil mapa torre inimigo =
-  let (sx1, sy1) = posicaoMapaParaEcra mapa (posicaoTorre torre)
-      (sx2, sy2) = posicaoMapaParaEcra mapa (posicaoInimigo inimigo)
+desenhaProjetil :: MapLayoutConfig -> Mapa -> Torre -> Inimigo -> Picture
+desenhaProjetil cfg mapa torre inimigo =
+  let (sx1, sy1) = posicaoMapaParaEcra cfg mapa (posicaoTorre torre)
+      (sx2, sy2) = posicaoMapaParaEcra cfg mapa (posicaoInimigo inimigo)
       cor = case projetilTorre torre of
         Projetil Fogo _ -> makeColorI 175 88 58 255
         Projetil Gelo _ -> makeColorI 111 150 168 255
@@ -593,8 +639,9 @@ desenhaPortais e =
 
 desenhaPortal :: ImmutableTowers -> Portal -> Picture
 desenhaPortal e portal =
-  let bloco = calculaTamanhoBloco (mapaJogo (jogo e))
-      (posX, posY) = posicaoMapaParaEcra (mapaJogo (jogo e)) (posicaoPortal portal)
+  let cfg = layoutRender e
+      bloco = calculaTamanhoBloco cfg (mapaJogo (jogo e))
+      (posX, posY) = posicaoMapaParaEcra cfg (mapaJogo (jogo e)) (posicaoPortal portal)
    in Translate posX posY $ modeloPortal bloco
 
 modeloPortal :: Float -> Picture
@@ -611,8 +658,9 @@ modeloPortal bloco =
 
 desenhaBase :: ImmutableTowers -> Base -> Picture
 desenhaBase e base =
-  let bloco = calculaTamanhoBloco (mapaJogo (jogo e))
-      (posX, posY) = posicaoMapaParaEcra (mapaJogo (jogo e)) (posicaoBase base)
+  let cfg = layoutRender e
+      bloco = calculaTamanhoBloco cfg (mapaJogo (jogo e))
+      (posX, posY) = posicaoMapaParaEcra cfg (mapaJogo (jogo e)) (posicaoBase base)
    in Translate posX posY $ modeloBase bloco
 
 modeloBase :: Float -> Picture
@@ -640,7 +688,7 @@ desenhaHUD e =
       resumo = waveSummary e
       speed = show (round (velocidadeJogo e) :: Int) ++ "X"
       y = alturaJanela / 2 - 42
-      painel = Color corPainel $ Translate 0 y $ rectangleSolid (larguraJanela - 72) 78
+      painel = Color corPainel $ Translate 0 y $ rectangleSolid (larguraJanela - 48) 82
       vidaCor = if vida > 40 then makeColorI 135 174 111 255 else makeColorI 190 82 72 255
       ondaValor =
         if modoJogoEscolhido e == ModoInfinito
@@ -651,13 +699,13 @@ desenhaHUD e =
         Nothing -> "LAST"
    in Pictures [
         painel,
-        Color (makeColorI 65 75 61 255) $ Translate 0 y $ rectangleWire (larguraJanela - 72) 78,
-        hudPill (-420) y "BASE" (show vida) vidaCor,
-        hudPill (-220) y "CREDITOS" (show creditos) (makeColorI 226 194 95 255),
-        hudPill 10 y "VAGA" ondaValor (makeColorI 226 153 76 255),
-        hudPill 242 y "RESTAM" (show (inimigosRestantesUI resumo)) corTextoSuave,
-        hudPill 456 y "VEL" speed (makeColorI 111 150 168 255),
-        Translate (larguraJanela / 2 - 224) (y - 25) $ Scale 0.078 0.078 $ Color (makeColorI 154 164 146 255) $ Text ("Mapa: " ++ nomeMapa (mapaAtual e) ++ "   " ++ proximaTexto)
+        Color (makeColorI 65 75 61 255) $ Translate 0 y $ rectangleWire (larguraJanela - 48) 82,
+        hudPill (-664) y 154 "BASE" (show vida) vidaCor,
+        hudPill (-486) y 154 "CREDITOS" (show creditos) (makeColorI 226 194 95 255),
+        hudPill (-308) y 154 "VAGA" ondaValor (makeColorI 226 153 76 255),
+        hudPill (-130) y 154 "RESTAM" (show (inimigosRestantesUI resumo)) corTextoSuave,
+        hudPill 48 y 154 "VEL" speed (makeColorI 111 150 168 255),
+        drawGlossBody 214 (y - 23) 0.074 (makeColorI 154 164 146 255) ("Mapa " ++ nomeMapa (mapaAtual e) ++ "  |  " ++ proximaTexto)
       ]
 
 desenhaControlesJogo :: ImmutableTowers -> Picture
@@ -666,13 +714,13 @@ desenhaControlesJogo e =
       speed = velocidadeJogo e
       toneSpeed alvo = if abs (speed - alvo) < 0.1 then Primary else Neutral
    in Pictures [
-        drawButton rato startWaveRect Primary "INICIAR",
-        drawButton rato pauseRect Neutral "||",
+        drawButton rato startWaveRect Primary "GO",
+        drawButton rato pauseRect Neutral "II",
         drawButton rato speed1Rect (toneSpeed 1) "1X",
         drawButton rato speed2Rect (toneSpeed 2) "2X",
         drawButton rato speed4Rect (toneSpeed 4) "4X",
-        drawButton rato hudToggleRect Neutral (if hudCompacto e then "HUD+" else "HUD-"),
-        drawButton rato shopToggleRect Neutral (if lojaVisivel e then "SHOP-" else "SHOP+")
+        drawButton rato hudToggleRect Neutral "HUD",
+        drawButton rato shopToggleRect Neutral "LOJA"
       ]
 
 desenhaPainelLateral :: ImmutableTowers -> Picture
@@ -681,47 +729,53 @@ desenhaPainelLateral e =
       resumo = waveSummary e
       torreSel = torreSelecionada e
       torreAtiva = torreFocada e >>= \pos -> findTorreNaPosicao pos (torresJogo (jogo e))
-      x = larguraJanela / 2 - 148
-      y = 64
-      linha n texto = Translate (x - 114) (y + 96 - fromIntegral n * 25) $
-        Scale 0.08 0.08 $ Color corTextoSuave $ Text texto
-      titulo = Translate (x - 114) (y + 132) $
-        Scale 0.13 0.13 $ Color (makeColorI 226 194 95 255) $ Text "PAINEL"
-      infoTorre = case torreAtiva of
-        Just torre -> [
-          "Torre: " ++ nomeProjetil (projetilTorre torre),
-          "Dano: " ++ show (floor $ danoTorre torre :: Int),
-          "Alcance: " ++ show (floor $ alcanceTorre torre :: Int),
-          "Rajada: " ++ show (rajadaTorre torre),
-          "Upgrade: " ++ show (custoUpgradeTorre torre) ++ " cred",
-          "Tecla U: melhorar"
+      x = larguraJanela / 2 - 186
+      y = 8
+      secX = x - 120
+      stats =
+        [ ("Vida", show (floor (vidaBase base) :: Int))
+        , ("Creditos", show (creditosBase base))
+        , ("Modo", nomeModoJogo (modoJogoEscolhido e))
+        , ("Vaga", mostraVaga resumo (modoJogoEscolhido e))
+        , ("Restam", show (inimigosRestantesUI resumo))
+        , ("Vel", show (round (velocidadeJogo e) :: Int) ++ "x")
+        ]
+      drawStat i (rotulo, valor) =
+        let rowY = y + 112 - fromIntegral i * 28
+         in Pictures
+              [ drawGlossBody secX rowY 0.07 (makeColorI 154 164 146 255) rotulo
+              , drawGlossBody (secX + 104) rowY 0.076 corTextoSuave valor
+              ]
+      towerHeader = drawGlossBody secX (y - 52) 0.07 (makeColorI 154 164 146 255) "TORRE"
+      towerInfo = case torreAtiva of
+        Just torre ->
+          [ drawGlossTitle secX (y - 84) 0.115 (makeColorI 226 194 95 255) (nomeProjetil (projetilTorre torre))
+          , drawGlossBody secX (y - 118) 0.072 corTextoSuave ("Dano " ++ show (floor $ danoTorre torre :: Int) ++ "  |  Alcance " ++ show (floor $ alcanceTorre torre :: Int))
+          , drawGlossBody secX (y - 146) 0.072 corTextoSuave ("Rajada " ++ show (rajadaTorre torre) ++ "  |  Upgrade " ++ show (custoUpgradeTorre torre))
           ]
         Nothing -> case torreSel of
-          Nothing -> ["Seleciona loja", "ou uma torre", "no mapa."]
-          Just torre -> [
-            "Comprar: " ++ nomeProjetil (projetilTorre torre),
-            "Alcance: " ++ show (floor $ alcanceTorre torre :: Int),
-            "Dano: " ++ show (floor $ danoTorre torre :: Int),
-            "Direito: cancelar"
+          Just torre ->
+            [ drawGlossTitle secX (y - 84) 0.115 (makeColorI 226 194 95 255) ("Comprar " ++ nomeProjetilCurto (projetilTorre torre))
+            , drawGlossBody secX (y - 118) 0.072 corTextoSuave ("Dano " ++ show (floor $ danoTorre torre :: Int) ++ "  |  Alcance " ++ show (floor $ alcanceTorre torre :: Int))
+            , drawGlossBody secX (y - 146) 0.072 corTextoSuave "Clique na relva para colocar"
             ]
-      linhas = [
-        "Vida base: " ++ show (floor (vidaBase base) :: Int),
-        "Creditos: " ++ show (creditosBase base),
-        "Modo: " ++ nomeModoJogo (modoJogoEscolhido e),
-        "Vaga: " ++ mostraVaga resumo (modoJogoEscolhido e),
-        "Mapa: " ++ nomeMapa (mapaAtual e),
-        "Restam: " ++ show (inimigosRestantesUI resumo) ++ " inimigos",
-        "Campanha: " ++ capituloEstagioTexto (progressoMeta e),
-        "Velocidade: " ++ show (round (velocidadeJogo e) :: Int) ++ "x"
-        ] ++ [""] ++ infoTorre
+          Nothing ->
+            [ drawGlossTitle secX (y - 84) 0.115 (makeColorI 176 184 171 255) "Sem selecao"
+            , drawGlossBody secX (y - 118) 0.072 corTextoSuave "Escolhe uma torre do arsenal"
+            , drawGlossBody secX (y - 146) 0.072 corTextoSuave "ou clica numa torre no mapa"
+            ]
    in Pictures [
-        Color (withAlpha 0.88 corPainel) $ Translate x y $ rectangleSolid 262 362,
-        Color (makeColorI 68 78 63 255) $ Translate x y $ rectangleWire 262 362,
-        titulo,
-        Pictures [linha i texto | (i, texto) <- zip [0 :: Int ..] linhas],
-        drawButton (posicaoRato e) upgradeRect (maybe Disabled (const Primary) torreAtiva) "UP",
-        drawButton (posicaoRato e) sellRect (maybe Disabled (const Danger) torreAtiva) "SELL",
-        drawButton (posicaoRato e) cancelRect Neutral "X"
+        Color (withAlpha 0.94 corPainel) $ Translate x y $ rectangleSolid 300 388,
+        Color (makeColorI 68 78 63 255) $ Translate x y $ rectangleWire 300 388,
+        drawGlossTitle secX (y + 154) 0.13 (makeColorI 226 194 95 255) "PAINEL",
+        drawGlossBody secX (y + 126) 0.068 (makeColorI 154 164 146 255) ("Mapa " ++ nomeMapa (mapaAtual e) ++ "  |  " ++ capituloEstagioTexto (progressoMeta e)),
+        Pictures [drawStat i item | (i, item) <- zip [0 :: Int ..] stats],
+        Color (withAlpha 0.16 (makeColorI 176 184 171 255)) $ Translate x (y - 30) $ rectangleSolid 244 2,
+        towerHeader,
+        Pictures towerInfo,
+        drawButton (posicaoRato e) upgradeRect (maybe Disabled (const Primary) torreAtiva) "UPGRADE",
+        drawButton (posicaoRato e) sellRect (maybe Disabled (const Danger) torreAtiva) "VENDER",
+        drawButton (posicaoRato e) cancelRect Neutral "LIMPAR"
       ]
 
 findTorreNaPosicao :: Posicao -> [Torre] -> Maybe Torre
@@ -739,18 +793,20 @@ desenhaLoja e =
   let loja = lojaJogo (jogo e)
       torreSel = torreSelecionada e
       creditos = creditosBase (baseJogo (jogo e))
+      UIRect panelX panelY panelW panelH = shopPanelRect (length loja)
    in Pictures $
-        [ Color (withAlpha 0.9 corPainel) $ Translate (-150) (-alturaJanela/2 + 66) $ rectangleSolid 760 108,
-          Color (makeColorI 68 78 63 255) $ Translate (-150) (-alturaJanela/2 + 66) $ rectangleWire 760 108,
-          Translate (-500) (-alturaJanela / 2 + 98) $ Scale 0.1 0.1 $ Color (makeColorI 154 164 146 255) $ Text ("ARSENAL  |  " ++ show (length loja) ++ " torres")
-        ] ++ zipWith (desenhaBotaoLoja torreSel creditos) [0..] loja
+        [ Color (withAlpha 0.94 corPainel) $ Translate panelX panelY $ rectangleSolid panelW panelH,
+          Color (makeColorI 68 78 63 255) $ Translate panelX panelY $ rectangleWire panelW panelH,
+          drawGlossTitle (panelX - panelW / 2 + 26) (panelY + 18) 0.11 (makeColorI 226 194 95 255) "ARSENAL",
+          drawGlossBody (panelX - panelW / 2 + 132) (panelY + 19) 0.07 (makeColorI 154 164 146 255) (show (length loja) ++ " torres"),
+          drawGlossBody (panelX - panelW / 2 + 26) (panelY - 14) 0.07 corTextoSuave ("Creditos " ++ show creditos)
+        ] ++ zipWith (desenhaBotaoLoja (length loja) torreSel creditos) [0..] loja
 
-desenhaBotaoLoja :: Maybe Torre -> Creditos -> Int -> (Creditos, Torre) -> Picture
-desenhaBotaoLoja torreSel creditos indice (preco, torre) =
-  let posX = -larguraJanela/2 + 82 + fromIntegral indice * 92
-      posY = -alturaJanela/2 + 66
+desenhaBotaoLoja :: Int -> Maybe Torre -> Creditos -> Int -> (Creditos, Torre) -> Picture
+desenhaBotaoLoja total torresel creditos indice (preco, torre) =
+  let (posX, posY) = shopSlotCenter total indice
       compravel = creditos >= preco
-      selecionada = case torreSel of
+      selecionada = case torresel of
                       Just t -> tipoProjetil (projetilTorre t) == tipoProjetil (projetilTorre torre)
                         && danoTorre t == danoTorre torre
                       Nothing -> False
@@ -761,8 +817,8 @@ desenhaBotaoLoja torreSel creditos indice (preco, torre) =
       corPreco = if compravel then makeColorI 226 194 95 255 else makeColorI 190 82 72 255
       textoInfo = if selecionada 
                   then Pictures [
-                    Translate (-31) 29 $ Scale 0.052 0.052 $ Color corTextoSuave $ Text ("A" ++ show (floor $ alcanceTorre torre :: Int)),
-                    Translate (-31) 18 $ Scale 0.052 0.052 $ Color corTextoSuave $ Text ("D" ++ show (floor $ danoTorre torre :: Int))
+                    drawGlossBody (-31) 29 0.046 corTextoSuave ("A " ++ show (floor $ alcanceTorre torre :: Int)),
+                    drawGlossBody (-31) 12 0.046 corTextoSuave ("D " ++ show (floor $ danoTorre torre :: Int))
                   ]
                   else Blank
    in Translate posX posY $ Pictures [
@@ -771,8 +827,8 @@ desenhaBotaoLoja torreSel creditos indice (preco, torre) =
         if selecionada then Color cor $ rectangleWire 86 100 else Blank,
         Translate 0 8 $ modeloTorre 42 (projetilTorre torre) selecionada,
         if compravel then Blank else Color (withAlpha 0.45 black) $ rectangleSolid 82 96,
-        Translate (-30) (-30) $ Scale 0.052 0.052 $ Color corTextoSuave $ Text (nomeProjetilCurto (projetilTorre torre)),
-        Translate 6 (-30) $ Scale 0.062 0.062 $ Color corPreco $ Text (show preco),
+        drawGlossBody (-26) (-33) 0.045 corTextoSuave (nomeProjetilCurto (projetilTorre torre)),
+        drawGlossBody 4 (-33) 0.053 corPreco (show preco),
         textoInfo
       ]
 
@@ -855,14 +911,14 @@ nomeModoJogo modoAtual = case modoAtual of
   ModoBoss -> "BOSS"
   ModoSandbox -> "SANDBOX"
 
-hudPill :: Float -> Float -> String -> String -> Color -> Picture
-hudPill x y etiqueta valor corValor =
+hudPill :: Float -> Float -> Float -> String -> String -> Color -> Picture
+hudPill x y w etiqueta valor corValor =
   Translate x y $
     Pictures
-      [ Color (withAlpha 0.24 corValor) $ rectangleSolid 164 48,
-        Color (withAlpha 0.55 corValor) $ rectangleWire 164 48,
-        Translate (-66) 6 $ Scale 0.085 0.085 $ Color (makeColorI 176 184 171 255) $ Text etiqueta,
-        Translate (-14) (-6) $ Scale 0.16 0.16 $ Color corValor $ Text valor
+      [ Color (withAlpha 0.24 corValor) $ rectangleSolid w 48,
+        Color (withAlpha 0.55 corValor) $ rectangleWire w 48,
+        Translate (-w / 2 + 14) 6 $ Scale 0.085 0.085 $ Color (makeColorI 176 184 171 255) $ Text etiqueta,
+        Translate (-w / 2 + 72) (-6) $ Scale 0.16 0.16 $ Color corValor $ Text valor
       ]
 
 mostraVaga :: WaveSummary -> ModoJogoEscolhido -> String
@@ -954,18 +1010,18 @@ blocoToPicture terreno x y bloco =
           Color (withAlpha 0.22 black) $ rectangleWire bloco bloco
           ]
 
-mapaToPicture :: Imagens -> Mapa -> Picture
-mapaToPicture _ terreno =
-  let bloco = calculaTamanhoBloco terreno
+mapaToPicture :: MapLayoutConfig -> Imagens -> Mapa -> Picture
+mapaToPicture cfg _ terreno =
+  let bloco = calculaTamanhoBloco cfg terreno
       dims = fromMaybe (MapDimensions 0 0) (dimensoesMapa terreno)
       largura = fromIntegral (larguraMapa dims)
       altura = fromIntegral (alturaMapa dims)
-      offsetX = offsetMapaX terreno
-      offsetY = offsetMapaY terreno
+      offsetX = offsetMapaX cfg terreno
+      offsetY = offsetMapaY cfg terreno
       margem = 0
    in Pictures [
         Color (makeColorI 38 58 38 255) $
-          Translate 0 mapaCentroY $ rectangleSolid (largura * bloco + margem) (altura * bloco + margem),
+          Translate 0 gameMapCenterY $ rectangleSolid (largura * bloco + margem) (altura * bloco + margem),
         Pictures [
           Translate
             (offsetX + fromIntegral x * bloco + bloco / 2)
@@ -976,22 +1032,19 @@ mapaToPicture _ terreno =
         ]
       ]
 
-calculaTamanhoBloco :: Mapa -> Float
-calculaTamanhoBloco terreno =
-  fromMaybe 1 (tamanhoBloco renderLayout terreno)
+calculaTamanhoBloco :: MapLayoutConfig -> Mapa -> Float
+calculaTamanhoBloco cfg terreno =
+  fromMaybe 1 (tamanhoBloco cfg terreno)
 
-posicaoMapaParaEcra :: Mapa -> Posicao -> (Float, Float)
-posicaoMapaParaEcra terreno pos =
-  fromMaybe (0, 0) (mapaParaEcra renderLayout terreno pos)
+posicaoMapaParaEcra :: MapLayoutConfig -> Mapa -> Posicao -> (Float, Float)
+posicaoMapaParaEcra cfg terreno pos =
+  fromMaybe (0, 0) (mapaParaEcra cfg terreno pos)
 
-offsetMapaX :: Mapa -> Float
-offsetMapaX terreno = maybe 0 fst (offsetMapa renderLayout terreno)
+offsetMapaX :: MapLayoutConfig -> Mapa -> Float
+offsetMapaX cfg terreno = maybe 0 fst (offsetMapa cfg terreno)
 
-offsetMapaY :: Mapa -> Float
-offsetMapaY terreno = maybe 0 snd (offsetMapa renderLayout terreno)
-
-escalaImagem :: Float -> Float -> Float
-escalaImagem bloco tamanhoOriginal = bloco / tamanhoOriginal
+offsetMapaY :: MapLayoutConfig -> Mapa -> Float
+offsetMapaY cfg terreno = maybe 0 snd (offsetMapa cfg terreno)
 
 carregarImagens :: IO ImmutableTowers
 carregarImagens = do
@@ -1025,13 +1078,13 @@ carregarImagens = do
       
       (jogoInicial, mapaInicial, totalOndas, metaInicialJogo) = prepararPartida modoGuardado metaGuardado
   
-  return $ ImmutableTowers jogoInicial imgs (MenuInicial Jogar) 0 Nothing Nothing Nothing perfilGuardado leaderboardGuardada metaInicialJogo modoGuardado mapaInicial 0 totalOndas False 1 [] False True
+  return $ ImmutableTowers jogoInicial imgs (MenuInicial Jogar) 0 (round larguraJanela, round alturaJanela) Nothing Nothing Nothing perfilGuardado leaderboardGuardada metaInicialJogo modoGuardado mapaInicial 0 totalOndas False 1 [] False True False 0
 
-ratoParaCelula :: Mapa -> (Float, Float) -> Maybe (Int, Int, Float, Float)
-ratoParaCelula mapa (mx, my) =
-  case ecraParaCelula renderLayout mapa (mx, my) of
+ratoParaCelula :: MapLayoutConfig -> Mapa -> (Float, Float) -> Maybe (Int, Int, Float, Float)
+ratoParaCelula cfg mapa (mx, my) =
+  case ecraParaCelula cfg mapa (mx, my) of
     Just (cx, cy) -> do
-      (centroX, centroY) <- mapaParaEcra renderLayout mapa (fromIntegral cx + 0.5, fromIntegral cy + 0.5)
+      (centroX, centroY) <- mapaParaEcra cfg mapa (fromIntegral cx + 0.5, fromIntegral cy + 0.5)
       return (cx, cy, centroX, centroY)
     Nothing -> Nothing
 
