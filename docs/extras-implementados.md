@@ -1,6 +1,8 @@
 # Extras implementados
 
-Este documento resume as funcionalidades extra acrescentadas ao Immutable Towers e a razao de cada decisao.
+Este documento resume as funcionalidades extra acrescentadas ao Immutable Towers.
+
+Para o estado jogavel atual e correcoes recentes, ver [[estado-atual]].
 
 ## Novos projeteis
 
@@ -13,36 +15,42 @@ Este documento resume as funcionalidades extra acrescentadas ao Immutable Towers
 
 ## Sinergias
 
-- Fogo + Resina prolonga o fogo, mantendo a ideia anterior do projeto.
+- Fogo + Resina prolonga o fogo.
 - Gelo + Eletrico cria atordoamento eletrico adicional.
 - Medo + Veneno aumenta o tempo de panico.
 - Fogo + Eletrico causa dano extra imediato.
-- Veneno + Resina causa dano extra, porque prende o inimigo numa zona toxica.
+- Veneno + Resina causa dano extra.
 
 ## Terrenos especiais
 
 - Asfalto: terreno caminhavel que aumenta a velocidade dos inimigos.
-- O mapa avancado troca o caminho principal por asfalto, criando uma variante desbloqueavel mais dificil.
+- O mapa avancado troca o caminho principal por asfalto, criando uma variante mais dificil.
 
 ## Inimigos com comportamento variado
 
 As ondas agora geram inimigos por nivel:
 
-- inimigos rapidos aparecem periodicamente;
-- inimigos brutos tem mais vida, dano e recompensa;
-- as ondas escalam vida, velocidade, dano e butim.
+- inimigos rapidos aparecem periodicamente
+- inimigos brutos tem mais vida, dano e recompensa
+- as ondas escalam vida, velocidade, dano e butim
 
 ## Melhorias de torres
 
 O jogador pode selecionar uma torre colocada e carregar em `U` para gastar creditos. O upgrade melhora:
 
-- dano;
-- alcance;
-- velocidade de disparo;
-- rajada, em torres mais fortes;
-- duracao do efeito do projetil.
+- dano
+- alcance
+- velocidade de disparo
+- rajada, em torres mais fortes
+- duracao do efeito do projetil
 
 O preco do upgrade tambem escala com o poder atual da torre.
+
+Melhorias recentes:
+
+- preview de upgrade no painel lateral antes da compra
+- feedback visual no momento do upgrade
+- modelos das torres com mais detalhes visuais conforme o poder/upgrade
 
 ## Modos de jogo
 
@@ -59,7 +67,10 @@ O preco do upgrade tambem escala com o poder atual da torre.
 
 ## Progressao
 
-O perfil local guarda jogos, vitorias, derrotas e melhor pontuacao. Apos obter vitorias, o jogo pode usar o mapa avancado com mais asfalto, aumentando a dificuldade.
+- Perfil local com jogos, vitorias, derrotas e melhor pontuacao.
+- Desbloqueio progressivo de torres.
+- Gemas e baus.
+- Fusao para a torre Tempestade.
 
 ## Editor de mapa
 
@@ -69,7 +80,7 @@ O perfil local guarda jogos, vitorias, derrotas e melhor pontuacao. Apos obter v
 
 ## Obstaculos dinamicos
 
-- `O` durante o jogo transforma a celula de caminho sob o rato em relva, funcionando como obstaculo simples/modificacao do percurso.
+- `O` durante o jogo transforma a celula de caminho sob o rato em relva, funcionando como obstaculo simples.
 
 ## Bot / sugestao
 
@@ -79,6 +90,8 @@ O perfil local guarda jogos, vitorias, derrotas e melhor pontuacao. Apos obter v
 ## Interface e grafismo
 
 - O mapa foi aumentado para reduzir margens pretas.
-- A shop foi compactada para suportar mais torres.
+- A shop passou a funcionar numa sidebar lateral esquerda.
 - Novos efeitos visuais indicam fogo, gelo, resina, medo, veneno e eletricidade.
+- Os disparos agora mostram um impacto visual mais claro no alvo.
+- A UI passou a bloquear corretamente o clique no mapa por baixo.
 - O editor e os atalhos tornam as funcionalidades extra acessiveis sem menus complexos.

@@ -1,7 +1,9 @@
 module UILayoutSpec (testesUILayout) where
 
 import ImmutableTowers (alturaJanela, larguraJanela)
+import RenderConfig (layoutParaJanela)
 import Test.HUnit
+import MapGeometry (MapLayoutConfig (..))
 import UIComponents (UIRect (..))
 import UIRects
 
@@ -11,7 +13,8 @@ testesUILayout =
     test
       [ "top controls stay inside top bar" ~: assertBool "Top controls must fit inside the HUD bar" allTopControlsInside,
         "shop panel stays above bottom edge" ~: assertBool "Shop panel must stay visible inside the screen" shopPanelInsideScreen,
-        "shop slots stay inside shop panel" ~: assertBool "Shop slots must fit inside the panel" shopSlotsInsidePanel
+        "shop slots stay inside shop panel" ~: assertBool "Shop slots must fit inside the panel" shopSlotsInsidePanel,
+        "responsive layouts keep enough usable map area" ~: assertBool "Representative resolutions must preserve useful map space" layoutResponsiveEnough
       ]
 
 allTopControlsInside :: Bool
@@ -31,6 +34,26 @@ shopSlotsInsidePanel =
         | i <- [0, 1]
         ]
    in all (`rectInside` panel) slotRects
+
+layoutResponsiveEnough :: Bool
+layoutResponsiveEnough =
+  all valido resolucoesTeste
+  where
+    resolucoesTeste =
+      [ (1280, 720)
+      , (1600, 900)
+      , (1920, 1080)
+      , (2560, 1440)
+      ]
+    valido resolucao =
+      let cfg = layoutParaJanela resolucao
+       in larguraUtil cfg >= 920 && alturaUtil cfg >= 620
+
+larguraUtil :: MapLayoutConfig -> Float
+larguraUtil = layoutLarguraMax
+
+alturaUtil :: MapLayoutConfig -> Float
+alturaUtil = layoutAlturaMax
 
 topBarRect :: UIRect
 topBarRect = UIRect 0 (alturaJanela / 2 - 42) (larguraJanela - 48) 82

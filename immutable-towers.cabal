@@ -79,12 +79,14 @@ test-suite immutable-towers-test
     other-modules:
         ImmutableTowers
         MetaTypes
+        RenderConfig
         Tarefa1Spec
         Tarefa2Spec
         Tarefa3Spec
         UIComponents
         UIRects
         UILayoutSpec
+        UIText
 
     main-is:          Spec.hs
 

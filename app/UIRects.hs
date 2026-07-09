@@ -30,15 +30,15 @@ module UIRects
   )
 where
 
-import ImmutableTowers (alturaJanela)
+import ImmutableTowers (larguraJanela)
 import UIComponents
 
 startWaveRect, pauseRect, speed1Rect, speed2Rect, speed4Rect, upgradeRect, sellRect, cancelRect :: UIRect
 startWaveRect = UIRect 464 494 138 42
-pauseRect = UIRect 588 494 46 42
+pauseRect = UIRect 588 494 54 42
 speed1Rect = UIRect 648 494 52 42
 speed2Rect = UIRect 706 494 52 42
-speed4Rect = UIRect 764 494 52 42
+speed4Rect = UIRect 764 494 56 42
 upgradeRect = UIRect 772 (-66) 122 42
 sellRect = UIRect 772 (-116) 122 42
 cancelRect = UIRect 772 (-166) 122 42
@@ -65,15 +65,25 @@ menuExitRect = UIRect (-520) (-362) 280 56
 shopPanelRect :: Int -> UIRect
 shopPanelRect total =
   let slots = max 2 total
-      largura = min 620 (172 + fromIntegral slots * 96)
-   in UIRect (-236) (-alturaJanela / 2 + 74) largura 110
+      colunas :: Int
+      colunas = 2
+      linhas :: Int
+      linhas = ceiling (fromIntegral slots / fromIntegral colunas :: Float)
+      largura = 224
+      altura = max 250 (124 + fromIntegral linhas * 104)
+      posX = -larguraJanela / 2 + largura / 2 + 34
+   in UIRect posX (-28) largura altura
 
 shopSlotCenter :: Int -> Int -> (Float, Float)
 shopSlotCenter total indice =
-  let UIRect panelX panelY panelW _ = shopPanelRect total
-      startX = panelX - panelW / 2 + 78
-      step = 96
-   in (startX + fromIntegral indice * step, panelY)
+  let UIRect panelX panelY panelW panelH = shopPanelRect total
+      coluna = indice `mod` 2
+      linha = indice `div` 2
+      startX = panelX - panelW / 2 + 64
+      startY = panelY + panelH / 2 - 122
+      stepX = 96
+      stepY = 104
+   in (startX + fromIntegral coluna * stepX, startY - fromIntegral linha * stepY)
 
 modeHistoriaRect, modeInfinitoRect, modeDesafioRect, modeBossRect, modeSandboxRect :: UIRect
 modeHistoriaRect = UIRect (-360) 90 300 152

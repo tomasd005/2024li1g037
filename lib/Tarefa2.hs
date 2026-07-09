@@ -28,6 +28,7 @@ inimigo2 =
     { posicaoInimigo = (1.0, 0.0),
       direcaoInimigo = Oeste,
       vidaInimigo = 80.0,
+      velocidadeBaseInimigo = 0.5,
       velocidadeInimigo = 0.5,
       ataqueInimigo = 15.0,
       butimInimigo = 70,

@@ -151,7 +151,7 @@ reage (EventKey (Char 's') Down _ _) estado@ImmutableTowers {jogo = jogoAtual, m
 reage (EventKey (Char 'l') Down _ _) estado = do
   guardado <- carregarJogoLocal
   case guardado of
-    Just jogoGuardado -> return estado {jogo = jogoGuardado, modo = EmJogo, torreSelecionada = Nothing, torreFocada = Nothing}
+    Just jogoGuardado -> return estado {jogo = jogoGuardado, modo = EmJogo, torreSelecionada = Nothing, torreFocada = Nothing, efeitosUpgrade = []}
     Nothing -> return estado
 reage (EventKey (Char 'b') Down _ _) estado@ImmutableTowers {jogo = jogoAtual, modo = EmJogo} =
   return $ adicionaMensagem MsgInfo "Bot sugeriu uma construcao" estado {jogo = botColocaTorre jogoAtual}
@@ -169,23 +169,26 @@ reage (EventKey (MouseButton LeftButton) Down _ posBruto) estado@ImmutableTowers
    in
   case acaoJogoClicada pos estado of
     Just novoEstado -> return novoEstado
-    Nothing | lojaVisivel estado ->
-      case find (\(i, _) -> lojaClicada (length (lojaJogo jogoAtual)) mx my i) (zip [0 ..] (lojaJogo jogoAtual)) of
-        Just (_, (preco, torre))
-          | creditosBase (baseJogo jogoAtual) >= preco ->
-              return $ adicionaMensagem MsgInfo ("Selecionada " ++ nomeTipoProjetil (projetilTorre torre)) estado {torreSelecionada = Just torre, torreFocada = Nothing, posicaoRato = Just (mx, my)}
-        _ -> case torreNoClique estado (mx, my) jogoAtual of
-          Just torre -> return estado {torreFocada = Just (posicaoTorre torre), posicaoRato = Just (mx, my)}
-          Nothing -> return estado {torreFocada = Nothing, posicaoRato = Just (mx, my)}
-    Nothing ->
-      case torreNoClique estado (mx, my) jogoAtual of
-        Just torre -> return estado {torreFocada = Just (posicaoTorre torre), posicaoRato = Just (mx, my)}
-        Nothing -> return estado {torreFocada = Nothing, posicaoRato = Just (mx, my)}
+    Nothing
+      | Just novoEstado <- selecionarTorreLoja estado (mx, my) ->
+          return novoEstado
+      | cliqueBloqueadoPelaUI estado pos ->
+          return estado {posicaoRato = Just (mx, my)}
+      | otherwise ->
+          case torreNoClique estado (mx, my) jogoAtual of
+            Just torre -> return estado {torreFocada = Just (posicaoTorre torre), posicaoRato = Just (mx, my)}
+            Nothing -> return estado {torreFocada = Nothing, posicaoRato = Just (mx, my)}
 reage (EventKey (MouseButton LeftButton) Down _ posBruto) estado@ImmutableTowers {jogo = jogoAtual, modo = EmJogo, torreSelecionada = Just torre} =
   let pos@(mx, my) = normalizaUIPos estado posBruto
    in case acaoJogoClicada pos estado of
     Just novoEstado -> return novoEstado
-    Nothing -> return $ colocaTorreSelecionada estado jogoAtual torre (mx, my)
+    Nothing
+      | Just novoEstado <- selecionarTorreLoja estado (mx, my) ->
+          return novoEstado
+      | cliqueBloqueadoPelaUI estado pos ->
+          return estado {posicaoRato = Just (mx, my)}
+      | otherwise ->
+          return $ colocaTorreSelecionada estado jogoAtual torre (mx, my)
 reage (EventKey (MouseButton LeftButton) Down _ posBruto) estado@ImmutableTowers {modo = Pausado} =
   let pos = normalizaUIPos estado posBruto
    in return $ case acaoPausaClicada pos estado of
@@ -288,7 +291,8 @@ iniciarPartida e =
               totalOndasPartida = totalOndas,
               resultadoRegistado = False,
               velocidadeJogo = 1,
-              mensagensUI = []
+              mensagensUI = [],
+              efeitosUpgrade = []
             }
 
 upgradeSelecionada :: ImmutableTowers -> Jogo -> Maybe Posicao -> ImmutableTowers
@@ -303,7 +307,8 @@ upgradeSelecionada estado jogoAtual foco =
           else
             let torresAtualizadas = reconstruirTorres (upgradeTorre torre)
                 baseAtualizada = base {creditosBase = creditosBase base - custo}
-             in adicionaMensagem MsgSucesso "Torre melhorada" estado {jogo = jogoAtual {torresJogo = torresAtualizadas, baseJogo = baseAtualizada}}
+                efeitoNovo = EfeitoUpgradeUI (posicaoTorre torre) 0.65
+             in adicionaMensagem MsgSucesso "Torre melhorada" estado {jogo = jogoAtual {torresJogo = torresAtualizadas, baseJogo = baseAtualizada}, efeitosUpgrade = efeitoNovo : take 11 (efeitosUpgrade estado)}
 
 colocaTorreSelecionada :: ImmutableTowers -> Jogo -> Torre -> (Float, Float) -> ImmutableTowers
 colocaTorreSelecionada estado jogoAtual torre (mx, my) =
@@ -376,6 +381,31 @@ lojaClicada total mx my indice =
         && mx <= posX + largura / 2
         && my >= posY - altura / 2
         && my <= posY + altura / 2
+
+selecionarTorreLoja :: ImmutableTowers -> (Float, Float) -> Maybe ImmutableTowers
+selecionarTorreLoja estado (mx, my)
+  | not (lojaVisivel estado) = Nothing
+  | otherwise =
+      case find (\(i, _) -> lojaClicada (length lojaAtual) mx my i) (zip [0 ..] lojaAtual) of
+        Just (_, (preco, torre))
+          | creditosBase (baseJogo (jogo estado)) >= preco ->
+              Just $ adicionaMensagem MsgInfo ("Selecionada " ++ nomeTipoProjetil (projetilTorre torre)) estado {torreSelecionada = Just torre, torreFocada = Nothing, posicaoRato = Just (mx, my)}
+          | otherwise ->
+              Just $ adicionaMensagem MsgAviso "Creditos insuficientes" estado {posicaoRato = Just (mx, my)}
+        Nothing -> Nothing
+  where
+    lojaAtual = lojaJogo (jogo estado)
+
+cliqueBloqueadoPelaUI :: ImmutableTowers -> (Float, Float) -> Bool
+cliqueBloqueadoPelaUI estado pos =
+  any (containsPoint pos) hitboxes
+  where
+    hitboxes =
+      [ UIRect 0 (alturaJanela / 2 - 46) larguraJanela 92
+      , UIRect 0 (-alturaJanela / 2 + 34) larguraJanela 68
+      ]
+      ++ [UIRect (larguraJanela / 2 - 186) 8 300 476 | not (hudCompacto estado)]
+      ++ [shopPanelRect (length (lojaJogo (jogo estado))) | lojaVisivel estado]
 
 opcaoMenuClicada :: Float -> Float -> Maybe MenuInicialOpcoes
 opcaoMenuClicada mx my = fmap fst $ find (containsPoint (mx, my) . snd) botoes

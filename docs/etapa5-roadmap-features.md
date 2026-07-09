@@ -1,80 +1,62 @@
-# Etapa 5 — Sistemas de progressão e modos
+# Etapa 5 - Sistemas de progressao e modos
 
-## Referências de design usadas
+Nota: esta pagina serve como direcao de design e roadmap. Para o estado real atual do projeto, ver [[estado-atual]].
+
+## Referencias de design usadas
 
 Tower defense modernos tendem a assentar em quatro pilares:
 
-1. **Variedade de torres** — cada torre resolve um problema diferente: dano direto, área, lentidão, dano contínuo, suporte ou economia.
-2. **Progressão/upgrade** — upgrades aumentam utilidade e preço, criando decisões de investimento em vez de apenas comprar sempre a mesma torre.
-3. **Modos de jogo** — campanha/história para aprendizagem e progressão, infinito para score/leaderboard, desafios com restrições para rejogabilidade.
-4. **Metagame leve** — perfil de jogador, pontuação, recordes e leaderboard local dão contexto ao desempenho.
+1. variedade de torres
+2. progressao e upgrades
+3. modos de jogo
+4. metagame leve
 
-## Ordem proposta de implementação
+## Ordem proposta de implementacao
 
 ### 5.1 Ajuste visual imediato
 
-- Aumentar o zoom do mapa para reduzir as bordas pretas laterais.
-- Manter a conversão de cliques sincronizada com a escala visual.
-- Encolher/deslocar o painel lateral para não tapar tanto o mapa.
+- aumentar o zoom util do mapa
+- manter a conversao de cliques sincronizada com a escala visual
+- reduzir sobreposicao dos paineis no campo jogavel
 
 ### 5.2 Conta / utilizador local
 
-Implementar um sistema local simples, sem rede:
-
-- `PerfilJogador` com nome, jogos jogados, vitórias, derrotas e melhor pontuação.
-- Ecrã de perfil no menu.
-- Nome editável por teclado.
-- Persistência futura em ficheiro local simples.
+- `PerfilJogador` com nome, jogos, vitorias, derrotas e melhor score
+- ecra de perfil
+- persistencia local
 
 ### 5.3 Leaderboard local
 
-- Registar pontuação por partida.
-- Guardar nome do jogador, modo, ondas sobrevividas, inimigos derrotados, créditos restantes e tempo.
-- Ecrã de leaderboard ordenado por pontuação.
+- registar pontuacao por partida
+- guardar nome, modo e desempenho
+- ecra de leaderboard local
 
 ### 5.4 Loja expandida
 
-Adicionar tipos de torre com identidade própria:
-
-- **Resina**: controlo/lentidão, baixa cadência, utilidade alta.
-- **Gelo**: slow em área ou duração maior.
-- **Fogo**: dano por segundo / dano contínuo.
-- **Canhão**: dano em área, lento e caro.
-- **Arqueiro/Balista**: barato, longo alcance, dano moderado.
-- **Suporte**: aumenta alcance/dano de torres próximas.
-
 Cada torre deve ter:
 
-- tipo;
-- nome;
-- modelo visual;
-- custo base;
-- nível;
-- caminho de upgrades;
-- preço do próximo upgrade.
+- tipo
+- nome
+- modelo visual
+- custo base
+- nivel
+- caminho de upgrades
+- preco do proximo upgrade
 
 ### 5.5 Upgrades
 
 Escalamento sugerido:
 
-- Preço: `precoBase * nivel * 2`.
-- Dano: aumenta 25–40% por nível.
-- Alcance: aumenta pouco, 10–15%.
-- Cadência/ciclo: reduz ligeiramente.
-- Utilidade especial: melhora duração/área/efeito secundário.
+- preco cresce com o poder atual
+- dano aumenta de forma clara por nivel
+- alcance aumenta menos do que dano
+- ciclo melhora com moderacao
+- utilidade especial melhora tambem
 
 ### 5.6 Modos de jogo
 
-- **História**: mapas/ondas predefinidos, dificuldade gradual.
-- **Infinito**: ondas geradas progressivamente, foco em score.
-- **Desafio**: restrições como só uma classe de torre ou créditos reduzidos.
-- **Sandbox/Treino**: créditos altos para experimentar torres/upgrades.
-
-## Primeira implementação recomendada
-
-Começar por 5.1 + estrutura base de 5.2/5.3:
-
-1. Ajustar zoom.
-2. Criar tipos `PerfilJogador`, `Pontuacao`, `ModoJogoEscolhido` no estado da app.
-3. Adicionar opções de menu para Perfil, Leaderboard e Modos.
-4. Só depois ligar pontuação real ao fim da partida.
+- Historia
+- Infinito
+- Desafio
+- Boss
+- Sandbox

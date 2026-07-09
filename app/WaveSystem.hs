@@ -34,7 +34,7 @@ criaInimigo nivel indice =
       velocidade = (if rapido then 2.4 else 1.25) + min 1.8 (escala * 0.08)
       ataque = 8 + escala * 1.6 + if bruto then 6 else 0
       butim = 14 + nivel * 4 + if bruto then 8 else 0
-   in Inimigo {posicaoInimigo = (0, 2), direcaoInimigo = Este, vidaInimigo = vida, velocidadeInimigo = velocidade, ataqueInimigo = ataque, butimInimigo = butim, projeteisInimigo = []}
+   in Inimigo {posicaoInimigo = (0, 2), direcaoInimigo = Este, vidaInimigo = vida, velocidadeBaseInimigo = velocidade, velocidadeInimigo = velocidade, ataqueInimigo = ataque, butimInimigo = butim, projeteisInimigo = []}
 
 ondasParaModo :: ModoJogoEscolhido -> [Onda]
 ondasParaModo modoAtual = case modoAtual of

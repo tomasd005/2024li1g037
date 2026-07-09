@@ -27,6 +27,7 @@ data ImmutableTowers = ImmutableTowers
     mensagensUI :: [MensagemUI],
     hudCompacto :: Bool,
     lojaVisivel :: Bool,
+    efeitosUpgrade :: [EfeitoUpgradeUI],
     backspacePerfilAtivo :: Bool,
     backspacePerfilTimer :: Float
   }
@@ -38,6 +39,12 @@ data MensagemUI = MensagemUI
   { textoMensagem :: String,
     tempoMensagem :: Float,
     tipoMensagem :: TipoMensagem
+  }
+  deriving (Show, Read, Eq)
+
+data EfeitoUpgradeUI = EfeitoUpgradeUI
+  { posicaoEfeitoUpgrade :: Posicao,
+    tempoEfeitoUpgrade :: Float
   }
   deriving (Show, Read, Eq)
 

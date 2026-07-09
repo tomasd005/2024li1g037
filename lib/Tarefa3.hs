@@ -305,6 +305,7 @@ atualizaDuracao (Finita d) t = Finita (max 0 (d - t))
 aplicaEfeitoProjetil :: Tempo -> Inimigo -> Inimigo
 aplicaEfeitoProjetil tempo inimigo =
   let projeteis = projeteisInimigo inimigo
+      velocidadeBase = velocidadeBaseInimigo inimigo
       -- Efeito de fogo: 2 dano por segundo
       temFogo = any (\p -> tipoProjetil p == Fogo) projeteis
       temVeneno = any (\p -> tipoProjetil p == Veneno) projeteis
@@ -314,11 +315,15 @@ aplicaEfeitoProjetil tempo inimigo =
       -- Efeito de gelo: impede movimento
       temGelo = any (\p -> tipoProjetil p == Gelo) projeteis
       temEletrico = any (\p -> tipoProjetil p == Eletrico) projeteis
-      velocAposControlo = if temGelo || temEletrico then 0 else velocidadeInimigo inimigo
+      controloTotal = temGelo || temEletrico
+      velocAposControlo = if controloTotal then 0 else velocidadeBase
       
       -- Efeito de resina: reduz velocidade para 80%
       temResina = any (\p -> tipoProjetil p == Resina) projeteis
-      velocFinal = if temResina then velocAposControlo * 0.8 else velocAposControlo
+      velocFinal
+        | controloTotal = 0
+        | temResina = velocidadeBase * 0.8
+        | otherwise = velocAposControlo
    
    in inimigo {
         vidaInimigo = vidaAposEfeitos,

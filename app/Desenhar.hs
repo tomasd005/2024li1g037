@@ -70,7 +70,7 @@ desenhaJogoCompleto e =
   Pictures [
     Color corFundoJogo $ rectangleSolid (viewW e) (viewH e),
     Scale (uiScale e) (uiScale e) $ Pictures
-      [ Color (makeColorI 20 28 23 232) $ Translate 0 (-alturaJanela/2 + 66) $ rectangleSolid larguraJanela 132,
+      [ Color (makeColorI 20 28 23 232) $ Translate 0 (-alturaJanela/2 + 34) $ rectangleSolid larguraJanela 68,
         Color (makeColorI 21 29 24 228) $ Translate 0 (alturaJanela/2 - 46) $ rectangleSolid larguraJanela 92,
     -- Camadas de baixo para cima
         mapaToPicture (layoutRender e) (imagens e) (mapaJogo (jogo e)),
@@ -78,6 +78,7 @@ desenhaJogoCompleto e =
         desenhaTorres e,
         desenhaInimigosComEfeitos e,
         desenhaProjeteis e,
+        desenhaEfeitosUpgrade e,
         desenhaPortais e,
         desenhaBase e (baseJogo (jogo e)),
         desenhaHUD e,
@@ -100,9 +101,9 @@ desenhaInstrucoes e =
     then Blank
     else case torreSelecionada e of
       Nothing ->
-        drawGlossBody (-larguraJanela/2 + 44) (-alturaJanela/2 + 116) 0.064 corTextoSuave "Loja compra torres  |  X alterna 1x 2x 4x  |  H e K escondem paineis"
+        drawGlossBody (-larguraJanela/2 + 286) (-alturaJanela/2 + 44) 0.064 corTextoSuave "Loja lateral  |  X alterna 1x 2x 4x  |  H e K escondem paineis"
       Just _ ->
-        drawGlossBody (-larguraJanela/2 + 44) (-alturaJanela/2 + 116) 0.066 (makeColorI 235 194 96 255) "Clique na relva para colocar  |  Botao direito cancela"
+        drawGlossBody (-larguraJanela/2 + 286) (-alturaJanela/2 + 44) 0.066 (makeColorI 235 194 96 255) "Clique na relva para colocar  |  Botao direito cancela"
 
 -- ============================================================================
 -- DESENHO DO MENU
@@ -415,7 +416,7 @@ desenhaPreVisualizacaoColocacao e =
                 Color (withAlpha 0.16 cor) $ Translate centroX centroY $ rectangleSolid bloco bloco,
                 Color (withAlpha 0.95 cor) $ Translate centroX centroY $ rectangleWire bloco bloco,
                 Color (withAlpha 0.18 (makeColorI 111 150 168 255)) $ Translate centroX centroY $ circleSolid alcance,
-                Color (withAlpha 0.55 corTextoSuave) $ Translate centroX centroY $ modeloTorre bloco (projetilTorre torre) True,
+                Color (withAlpha 0.55 corTextoSuave) $ Translate centroX centroY $ modeloTorre bloco torre True,
                 if valido
                   then Blank
                   else Color (withAlpha 0.85 cor) $ Translate centroX centroY $ Pictures [
@@ -431,15 +432,17 @@ desenhaTorreSprite e torre =
   let cfg = layoutRender e
       bloco = calculaTamanhoBloco cfg (mapaJogo (jogo e))
       (posX, posY) = posicaoMapaParaEcra cfg (mapaJogo (jogo e)) (posicaoTorre torre)
-   in Translate posX posY $ modeloTorre bloco (projetilTorre torre) False
+   in Translate posX posY $ modeloTorre bloco torre False
 
-modeloTorre :: Float -> Projetil -> Bool -> Picture
-modeloTorre bloco projetil selecionada =
+modeloTorre :: Float -> Torre -> Bool -> Picture
+modeloTorre bloco torre selecionada =
   let corpo = makeColorI 66 72 69 255
       sombra = makeColorI 14 18 16 170
       metalClaro = makeColorI 186 192 184 255
       metalEscuro = makeColorI 38 43 41 255
+      projetil = projetilTorre torre
       tipo = tipoProjetil projetil
+      raridade = raridadeTorreAproximada torre
       acento = case tipo of
         Resina -> makeColorI 145 107 61 255
         Gelo -> makeColorI 111 150 168 255
@@ -447,6 +450,13 @@ modeloTorre bloco projetil selecionada =
         Medo -> makeColorI 170 132 210 255
         Veneno -> makeColorI 101 168 92 255
         Eletrico -> makeColorI 226 194 95 255
+      basePlate = case raridade of
+        Comum -> makeColorI 88 98 86 255
+        Raro -> makeColorI 86 108 129 255
+        Epico -> makeColorI 107 88 132 255
+        Lendario -> makeColorI 146 106 58 255
+        Mitico -> makeColorI 168 84 108 255
+      nivelVisual = nivelVisualTorre torre
       escala = bloco / 28
       aro = if selecionada
             then Color (makeColorI 226 194 95 255) $ rectangleWire (bloco * 0.92) (bloco * 0.92)
@@ -464,6 +474,48 @@ modeloTorre bloco projetil selecionada =
         Medo -> Pictures [Color acento $ Translate 0 12 $ ThickCircle 6 3, Color acento $ Translate 0 12 $ rectangleSolid 12 2]
         Veneno -> Pictures [Color acento $ Translate 0 12 $ circleSolid 6, Color (withAlpha 0.55 metalClaro) $ Translate (-2) 14 $ circleSolid 2]
         Eletrico -> Color acento $ Translate 0 12 $ ThickCircle 5 3
+      extraNivel1 =
+        if nivelVisual >= 1
+          then Pictures
+            [ Color (withAlpha 0.8 acento) $ Translate (-7) 0 $ rectangleSolid 3 15
+            , Color (withAlpha 0.8 acento) $ Translate 7 0 $ rectangleSolid 3 15
+            ]
+          else Blank
+      extraNivel2 =
+        if nivelVisual >= 2
+          then Pictures
+            [ Color metalClaro $ Translate 0 16 $ rectangleSolid 22 3
+            , Color (withAlpha 0.75 acento) $ Translate 0 4 $ ThickCircle 8 2.4
+            ]
+          else Blank
+      extraNivel3 =
+        if nivelVisual >= 3
+          then Pictures
+            [ Color (withAlpha 0.28 acento) $ ThickCircle 15 4
+            , Color (withAlpha 0.9 acento) $ Translate 0 18 $ Polygon [(-5,0),(0,5),(5,0),(0,-4)]
+            ]
+          else Blank
+      extraRaridade = case raridade of
+        Comum -> Blank
+        Raro ->
+          Color (withAlpha 0.85 basePlate) $ Translate 0 (-13) $ rectangleSolid 24 4
+        Epico ->
+          Pictures
+            [ Color (withAlpha 0.85 basePlate) $ Translate 0 (-13) $ rectangleSolid 24 4
+            , Color (withAlpha 0.72 acento) $ Translate 0 10 $ ThickCircle 11 2
+            ]
+        Lendario ->
+          Pictures
+            [ Color (withAlpha 0.88 basePlate) $ Translate 0 (-13) $ rectangleSolid 26 5
+            , Color (withAlpha 0.82 acento) $ Translate (-10) 3 $ rectangleSolid 3 18
+            , Color (withAlpha 0.82 acento) $ Translate 10 3 $ rectangleSolid 3 18
+            ]
+        Mitico ->
+          Pictures
+            [ Color (withAlpha 0.9 basePlate) $ Translate 0 (-13) $ rectangleSolid 28 5
+            , Color (withAlpha 0.24 acento) $ ThickCircle 18 5
+            , Color (withAlpha 0.82 acento) $ Translate 0 18 $ Polygon [(-7,0),(0,7),(7,0),(0,-5)]
+            ]
    in Pictures [
         Color sombra $ Translate 2 (-3) $ rectangleSolid (bloco * 0.62) (bloco * 0.72),
         aro,
@@ -474,9 +526,26 @@ modeloTorre bloco projetil selecionada =
           Color metalClaro $ Translate 0 8 $ rectangleSolid 18 4,
           Color metalClaro $ Translate 0 (-10) $ rectangleSolid 21 5,
           Color (withAlpha 0.38 black) $ Translate 5 0 $ Polygon [(0,-8),(3,-8),(2,8),(-1,8)],
-          topo
+          topo,
+          extraRaridade,
+          extraNivel1,
+          extraNivel2,
+          extraNivel3
         ]
       ]
+
+nivelVisualTorre :: Torre -> Int
+nivelVisualTorre torre
+  | score >= 7.8 = 3
+  | score >= 5.6 = 2
+  | score >= 4.0 = 1
+  | otherwise = 0
+  where
+    score =
+      danoTorre torre / 18
+        + alcanceTorre torre / 4.5
+        + fromIntegral (rajadaTorre torre) * 0.55
+        + max 0 (1.7 - cicloTorre torre) * 1.5
 
 -- Barra de cooldown acima da torre
 desenhaCooldownTorre :: MapLayoutConfig -> Mapa -> Torre -> Picture
@@ -605,6 +674,26 @@ desenhaProjeteis :: ImmutableTowers -> Picture
 desenhaProjeteis e =
   Pictures $ concatMap (desenhaProjeteisdeTorre e) (torresJogo (jogo e))
 
+desenhaEfeitosUpgrade :: ImmutableTowers -> Picture
+desenhaEfeitosUpgrade e =
+  let cfg = layoutRender e
+      mapa = mapaJogo (jogo e)
+   in Pictures (map (desenhaEfeitoUpgrade cfg mapa) (efeitosUpgrade e))
+
+desenhaEfeitoUpgrade :: MapLayoutConfig -> Mapa -> EfeitoUpgradeUI -> Picture
+desenhaEfeitoUpgrade cfg mapa efeito =
+  let t = max 0 (min 1 (tempoEfeitoUpgrade efeito / 0.65))
+      bloco = calculaTamanhoBloco cfg mapa
+      raio = bloco * (0.34 + (1 - t) * 0.38)
+      espessura = max 2 (bloco * 0.05 * t + 1.8)
+      alpha = 0.18 + t * 0.5
+      (x, y) = posicaoMapaParaEcra cfg mapa (posicaoEfeitoUpgrade efeito)
+   in Translate x y $
+        Pictures
+          [ Color (withAlpha alpha (makeColorI 226 194 95 255)) $ ThickCircle raio espessura,
+            Color (withAlpha (alpha * 0.7) (makeColorI 239 234 186 255)) $ ThickCircle (raio * 0.72) (max 1.5 (espessura * 0.58))
+          ]
+
 desenhaProjeteisdeTorre :: ImmutableTowers -> Torre -> [Picture]
 desenhaProjeteisdeTorre e torre =
   -- Só desenha projéteis se torre acabou de disparar (cooldown alto)
@@ -612,8 +701,13 @@ desenhaProjeteisdeTorre e torre =
   then
     let inimigosAlvo = take (rajadaTorre torre) (inimigosNoAlcance torre (inimigosJogo (jogo e)))
         cfg = layoutRender e
-     in map (desenhaProjetil cfg (mapaJogo (jogo e)) torre) inimigosAlvo
+        fase = if cicloTorre torre <= 0 then 0 else (tempoTorre torre - cicloTorre torre * 0.8) / (cicloTorre torre * 0.2)
+     in concatMap (desenhaProjetilComDano cfg (mapaJogo (jogo e)) torre fase) inimigosAlvo
   else []
+
+desenhaProjetilComDano :: MapLayoutConfig -> Mapa -> Torre -> Float -> Inimigo -> [Picture]
+desenhaProjetilComDano cfg mapa torre fase inimigo =
+  [desenhaProjetil cfg mapa torre inimigo, desenhaNumeroDano cfg mapa torre inimigo fase]
 
 desenhaProjetil :: MapLayoutConfig -> Mapa -> Torre -> Inimigo -> Picture
 desenhaProjetil cfg mapa torre inimigo =
@@ -626,10 +720,32 @@ desenhaProjetil cfg mapa torre inimigo =
         Projetil Medo _ -> makeColorI 170 132 210 255
         Projetil Veneno _ -> makeColorI 101 168 92 255
         Projetil Eletrico _ -> makeColorI 226 194 95 255
-   in Color cor $ Line [
-        (sx1, sy1),
-        (sx2, sy2)
-      ]
+      spark =
+        Translate sx2 sy2 $
+          Pictures
+            [ Color (withAlpha 0.82 cor) $ ThickCircle 5 2.2
+            , Color (withAlpha 0.9 (makeColorI 241 236 214 255)) $ Line [(-6,0),(6,0)]
+            , Color (withAlpha 0.9 (makeColorI 241 236 214 255)) $ Line [(0,-6),(0,6)]
+            ]
+   in Pictures
+        [ Color cor $ Line [(sx1, sy1), (sx2, sy2)]
+        , spark
+        ]
+
+desenhaNumeroDano :: MapLayoutConfig -> Mapa -> Torre -> Inimigo -> Float -> Picture
+desenhaNumeroDano cfg mapa torre inimigo fase =
+  let (sx, sy) = posicaoMapaParaEcra cfg mapa (posicaoInimigo inimigo)
+      subida = (1 - max 0 (min 1 fase)) * 18
+      danoBase = max 1 (floor (danoTorre torre) :: Int)
+      cor =
+        case tipoProjetil (projetilTorre torre) of
+          Fogo -> makeColorI 241 156 118 255
+          Gelo -> makeColorI 191 225 241 255
+          Resina -> makeColorI 210 178 126 255
+          Medo -> makeColorI 218 188 245 255
+          Veneno -> makeColorI 173 223 154 255
+          Eletrico -> makeColorI 248 224 123 255
+   in drawUITextCentered sx (sy + 22 + subida) 2.3 cor ("-" ++ show danoBase)
 
 -- ============================================================================
 -- DESENHO DE PORTAIS
@@ -717,7 +833,7 @@ desenhaControlesJogo e =
       toneSpeed alvo = if abs (speed - alvo) < 0.1 then Primary else Neutral
    in Pictures [
         drawButton rato startWaveRect Primary "GO",
-        drawButton rato pauseRect Neutral "II",
+        drawButton rato pauseRect Neutral "||",
         drawButton rato speed1Rect (toneSpeed 1) "1X",
         drawButton rato speed2Rect (toneSpeed 2) "2X",
         drawButton rato speed4Rect (toneSpeed 4) "4X",
@@ -751,16 +867,29 @@ desenhaPainelLateral e =
       towerHeader = drawGlossBody secX (y - 52) 0.07 (makeColorI 154 164 146 255) "TORRE"
       towerInfo = case torreAtiva of
         Just torre ->
-          [ drawGlossTitle secX (y - 84) 0.115 (makeColorI 226 194 95 255) (nomeProjetil (projetilTorre torre))
-          , drawGlossBody secX (y - 118) 0.072 corTextoSuave ("Dano " ++ show (floor $ danoTorre torre :: Int) ++ "  |  Alcance " ++ show (floor $ alcanceTorre torre :: Int))
-          , drawGlossBody secX (y - 146) 0.072 corTextoSuave ("Rajada " ++ show (rajadaTorre torre) ++ "  |  Upgrade " ++ show (custoUpgradeTorre torre))
-          ]
+          let previa = upgradeTorre torre
+              spec = towerSpecAproximada torre
+              custo = custoUpgradeTorre torre
+              upgradeHover = maybe False (`containsPoint` upgradeRect) (posicaoRato e)
+              corPreview = if upgradeHover then makeColorI 239 226 153 255 else makeColorI 189 198 180 255
+           in [ drawGlossTitle secX (y - 84) 0.115 (makeColorI 226 194 95 255) (nomeTowerSpec spec)
+              , drawGlossBody secX (y - 110) 0.064 (corRaridade (raridadeTowerSpec spec)) (nomeRaridadeUI (raridadeTowerSpec spec) ++ "  |  " ++ nomeProjetil (projetilTorre torre))
+              , drawGlossBody secX (y - 138) 0.072 corTextoSuave ("Dano " ++ show (floor $ danoTorre torre :: Int) ++ "  |  Alcance " ++ show (floor $ alcanceTorre torre :: Int))
+              , drawGlossBody secX (y - 166) 0.072 corTextoSuave ("Rajada " ++ show (rajadaTorre torre) ++ "  |  Ciclo " ++ showTempoCurto (cicloTorre torre))
+              , drawGlossBody secX (y - 194) 0.068 corTextoSuave ("Efeito " ++ showDuracaoProjetil (projetilTorre torre) ++ "  |  Venda " ++ show (valorVendaTorre torre))
+              , drawGlossBody secX (y - 226) 0.068 corPreview ("Upgrade +" ++ show (floor (danoTorre previa - danoTorre torre) :: Int) ++ " dano  +" ++ showDeltaFloat (alcanceTorre previa - alcanceTorre torre) ++ " alcance")
+              , drawGlossBody secX (y - 252) 0.068 corPreview ("Ciclo " ++ showTempoCurto (cicloTorre torre) ++ " -> " ++ showTempoCurto (cicloTorre previa))
+              , drawGlossBody secX (y - 278) 0.068 corPreview ("Efeito " ++ showDuracaoProjetil (projetilTorre torre) ++ " -> " ++ showDuracaoProjetil (projetilTorre previa) ++ "  |  Custo " ++ show custo)
+              ]
         Nothing -> case torreSel of
           Just torre ->
-            [ drawGlossTitle secX (y - 84) 0.115 (makeColorI 226 194 95 255) ("Comprar " ++ nomeProjetilCurto (projetilTorre torre))
-            , drawGlossBody secX (y - 118) 0.072 corTextoSuave ("Dano " ++ show (floor $ danoTorre torre :: Int) ++ "  |  Alcance " ++ show (floor $ alcanceTorre torre :: Int))
-            , drawGlossBody secX (y - 146) 0.072 corTextoSuave "Clique na relva para colocar"
-            ]
+            let spec = towerSpecAproximada torre
+             in [ drawGlossTitle secX (y - 84) 0.115 (makeColorI 226 194 95 255) ("Comprar " ++ nomeTowerSpec spec)
+                , drawGlossBody secX (y - 110) 0.064 (corRaridade (raridadeTowerSpec spec)) (nomeRaridadeUI (raridadeTowerSpec spec) ++ "  |  " ++ nomeProjetilCurto (projetilTorre torre))
+                , drawGlossBody secX (y - 138) 0.072 corTextoSuave ("Dano " ++ show (floor $ danoTorre torre :: Int) ++ "  |  Alcance " ++ show (floor $ alcanceTorre torre :: Int))
+                , drawGlossBody secX (y - 166) 0.072 corTextoSuave ("Rajada " ++ show (rajadaTorre torre) ++ "  |  Efeito " ++ showDuracaoProjetil (projetilTorre torre))
+                , drawGlossBody secX (y - 194) 0.072 corTextoSuave "Clique na relva para colocar"
+                ]
           Nothing ->
             [ drawGlossTitle secX (y - 84) 0.115 (makeColorI 176 184 171 255) "Sem selecao"
             , drawGlossBody secX (y - 118) 0.072 corTextoSuave "Escolhe uma torre do arsenal"
@@ -776,8 +905,8 @@ desenhaPainelLateral e =
           [ drawButton (posicaoRato e) cancelRect Neutral "LIMPAR" ]
         _ -> []
    in Pictures [
-        Color (withAlpha 0.94 corPainel) $ Translate x y $ rectangleSolid 300 388,
-        Color (makeColorI 68 78 63 255) $ Translate x y $ rectangleWire 300 388,
+        Color (withAlpha 0.94 corPainel) $ Translate x y $ rectangleSolid 300 476,
+        Color (makeColorI 68 78 63 255) $ Translate x y $ rectangleWire 300 476,
         drawGlossTitle secX (y + 154) 0.13 (makeColorI 226 194 95 255) "PAINEL",
         drawGlossBody secX (y + 126) 0.068 (makeColorI 154 164 146 255) ("Mapa " ++ nomeMapa (mapaAtual e) ++ "  |  " ++ capituloEstagioTexto (progressoMeta e)),
         Pictures [drawStat i item | (i, item) <- zip [0 :: Int ..] stats],
@@ -803,17 +932,20 @@ desenhaLoja e =
       torreSel = torreSelecionada e
       creditos = creditosBase (baseJogo (jogo e))
       UIRect panelX panelY panelW panelH = shopPanelRect (length loja)
+      headerY = panelY + panelH / 2 - 34
    in Pictures $
         [ Color (withAlpha 0.94 corPainel) $ Translate panelX panelY $ rectangleSolid panelW panelH,
           Color (makeColorI 68 78 63 255) $ Translate panelX panelY $ rectangleWire panelW panelH,
-          drawGlossTitle (panelX - panelW / 2 + 26) (panelY + 18) 0.11 (makeColorI 226 194 95 255) "ARSENAL",
-          drawGlossBody (panelX - panelW / 2 + 132) (panelY + 19) 0.07 (makeColorI 154 164 146 255) (show (length loja) ++ " torres"),
-          drawGlossBody (panelX - panelW / 2 + 26) (panelY - 14) 0.07 corTextoSuave ("Creditos " ++ show creditos)
+          drawGlossTitle (panelX - panelW / 2 + 20) headerY 0.095 (makeColorI 226 194 95 255) "ARSENAL",
+          drawGlossBody (panelX - panelW / 2 + 20) (headerY - 28) 0.062 corTextoSuave ("Creditos " ++ show creditos),
+          drawGlossBody (panelX - panelW / 2 + 130) (headerY - 28) 0.058 (makeColorI 154 164 146 255) (show (length loja) ++ " torres"),
+          Color (withAlpha 0.16 (makeColorI 176 184 171 255)) $ Translate panelX (headerY - 42) $ rectangleSolid (panelW - 32) 2
         ] ++ zipWith (desenhaBotaoLoja (length loja) torreSel creditos) [0..] loja
 
 desenhaBotaoLoja :: Int -> Maybe Torre -> Creditos -> Int -> (Creditos, Torre) -> Picture
 desenhaBotaoLoja total torresel creditos indice (preco, torre) =
   let (posX, posY) = shopSlotCenter total indice
+      spec = towerSpecAproximada torre
       compravel = creditos >= preco
       selecionada = case torresel of
                       Just t -> tipoProjetil (projetilTorre t) == tipoProjetil (projetilTorre torre)
@@ -834,10 +966,11 @@ desenhaBotaoLoja total torresel creditos indice (preco, torre) =
         Color corFundo $ rectangleSolid 82 96,
         Color cor $ rectangleWire 82 96,
         if selecionada then Color cor $ rectangleWire 86 100 else Blank,
-        Translate 0 8 $ modeloTorre 42 (projetilTorre torre) selecionada,
+        Translate 0 8 $ modeloTorre 42 torre selecionada,
         if compravel then Blank else Color (withAlpha 0.45 black) $ rectangleSolid 82 96,
-        drawGlossBody (-26) (-33) 0.045 corTextoSuave (nomeProjetilCurto (projetilTorre torre)),
+        drawGlossBody (-28) (-33) 0.045 corTextoSuave (nomeProjetilCurto (projetilTorre torre)),
         drawGlossBody 4 (-33) 0.053 corPreco (show preco),
+        drawGlossBody (-26) (-45) 0.036 (corRaridade (raridadeTowerSpec spec)) (siglaRaridade (raridadeTowerSpec spec)),
         textoInfo
       ]
 
@@ -919,6 +1052,46 @@ nomeModoJogo modoAtual = case modoAtual of
   ModoDesafio -> "DESAFIO"
   ModoBoss -> "BOSS"
   ModoSandbox -> "SANDBOX"
+
+showTempoCurto :: Float -> String
+showTempoCurto valor =
+  let arredondado = fromIntegral (round (valor * 10) :: Int) / 10 :: Float
+   in show arredondado
+
+showDeltaFloat :: Float -> String
+showDeltaFloat valor =
+  let arredondado = fromIntegral (round (valor * 10) :: Int) / 10 :: Float
+   in show arredondado
+
+showDuracaoProjetil :: Projetil -> String
+showDuracaoProjetil projetil =
+  case duracaoProjetil projetil of
+    Infinita -> "INF"
+    Finita valor -> showTempoCurto valor ++ "s"
+
+nomeRaridadeUI :: Raridade -> String
+nomeRaridadeUI raridade = case raridade of
+  Comum -> "COMUM"
+  Raro -> "RARO"
+  Epico -> "EPICO"
+  Lendario -> "LENDARIO"
+  Mitico -> "MITICO"
+
+siglaRaridade :: Raridade -> String
+siglaRaridade raridade = case raridade of
+  Comum -> "C"
+  Raro -> "R"
+  Epico -> "E"
+  Lendario -> "L"
+  Mitico -> "M"
+
+corRaridade :: Raridade -> Color
+corRaridade raridade = case raridade of
+  Comum -> makeColorI 182 194 177 255
+  Raro -> makeColorI 144 193 222 255
+  Epico -> makeColorI 191 150 232 255
+  Lendario -> makeColorI 231 187 113 255
+  Mitico -> makeColorI 225 126 158 255
 
 hudPill :: Float -> Float -> Float -> String -> String -> Color -> Picture
 hudPill x y w etiqueta valor corValor =
@@ -1087,7 +1260,7 @@ carregarImagens = do
       
       (jogoInicial, mapaInicial, totalOndas, metaInicialJogo) = prepararPartida modoGuardado metaGuardado
   
-  return $ ImmutableTowers jogoInicial imgs (MenuInicial Jogar) 0 (round larguraJanela, round alturaJanela) Nothing Nothing Nothing perfilGuardado leaderboardGuardada metaInicialJogo modoGuardado mapaInicial 0 totalOndas False 1 [] False True False 0
+  return $ ImmutableTowers jogoInicial imgs (MenuInicial Jogar) 0 (round larguraJanela, round alturaJanela) Nothing Nothing Nothing perfilGuardado leaderboardGuardada metaInicialJogo modoGuardado mapaInicial 0 totalOndas False 1 [] False True [] False 0
 
 ratoParaCelula :: MapLayoutConfig -> Mapa -> (Float, Float) -> Maybe (Int, Int, Float, Float)
 ratoParaCelula cfg mapa (mx, my) =

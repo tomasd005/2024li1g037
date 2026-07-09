@@ -80,6 +80,10 @@ testesTarefa3 =
         "aplicaEfeitoProjetil - resina reduz velocidade" ~:
           let inimigo' = aplicaEfeitoProjetil 1.0 inimigoComResina
            in velocidadeInimigo inimigo' < velocidadeInimigo inimigoComResina ~=? True,
+
+        "aplicaEfeitoProjetil - recupera velocidade apos gelo" ~:
+          let inimigo' = aplicaEfeitoProjetil 1.0 (inimigo1 {velocidadeInimigo = 0, projeteisInimigo = []})
+           in velocidadeInimigo inimigo' == velocidadeBaseInimigo inimigo1 ~=? True,
         
         "removeProjeteisExpirados - remove expirados" ~:
           let inimigo' = removeProjeteisExpirados inimigoComProjetilExpirado
@@ -207,6 +211,7 @@ inimigoProximo = inimigo1 {posicaoInimigo = (0.5, 1.0)}
 inimigoMovel :: Inimigo
 inimigoMovel = inimigo1 {
   posicaoInimigo = (1.0, 1.0),
+  velocidadeBaseInimigo = 1.0,
   velocidadeInimigo = 1.0,
   direcaoInimigo = Este
 }
@@ -227,6 +232,7 @@ inimigoComFogo = inimigo1 {
 -- Inimigo com gelo
 inimigoComGelo :: Inimigo
 inimigoComGelo = inimigo1 {
+  velocidadeBaseInimigo = 1.0,
   velocidadeInimigo = 1.0,
   projeteisInimigo = [Projetil Gelo (Finita 3.0)]
 }
@@ -234,6 +240,7 @@ inimigoComGelo = inimigo1 {
 -- Inimigo com resina
 inimigoComResina :: Inimigo
 inimigoComResina = inimigo1 {
+  velocidadeBaseInimigo = 1.0,
   velocidadeInimigo = 1.0,
   projeteisInimigo = [Projetil Resina (Finita 4.0)]
 }
@@ -282,9 +289,9 @@ instance Eq Portal where
     p1 == p2 && o1 == o2
 
 instance Eq Inimigo where
-  (Inimigo {posicaoInimigo = p1, direcaoInimigo = d1, vidaInimigo = v1, velocidadeInimigo = vel1, ataqueInimigo = a1, butimInimigo = b1, projeteisInimigo = proj1}) 
-    == (Inimigo {posicaoInimigo = p2, direcaoInimigo = d2, vidaInimigo = v2, velocidadeInimigo = vel2, ataqueInimigo = a2, butimInimigo = b2, projeteisInimigo = proj2}) =
-    p1 == p2 && d1 == d2 && v1 == v2 && vel1 == vel2 && a1 == a2 && b1 == b2 && proj1 == proj2
+  (Inimigo {posicaoInimigo = p1, direcaoInimigo = d1, vidaInimigo = v1, velocidadeBaseInimigo = vb1, velocidadeInimigo = vel1, ataqueInimigo = a1, butimInimigo = b1, projeteisInimigo = proj1}) 
+    == (Inimigo {posicaoInimigo = p2, direcaoInimigo = d2, vidaInimigo = v2, velocidadeBaseInimigo = vb2, velocidadeInimigo = vel2, ataqueInimigo = a2, butimInimigo = b2, projeteisInimigo = proj2}) =
+    p1 == p2 && d1 == d2 && v1 == v2 && vb1 == vb2 && vel1 == vel2 && a1 == a2 && b1 == b2 && proj1 == proj2
 
 instance Eq Projetil where
   (Projetil {tipoProjetil = t1, duracaoProjetil = d1}) 

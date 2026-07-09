@@ -9,6 +9,7 @@ module UIComponents
 where
 
 import Graphics.Gloss
+import UIText (drawUITextCentered)
 
 data UIRect = UIRect
   { rectX :: !Float,
@@ -67,11 +68,9 @@ brighten baseColor =
 
 drawButtonLabel :: String -> Float -> Color -> Picture
 drawButtonLabel label buttonWidth textColor =
-  let scaleText = min 0.11 (max 0.05 (buttonWidth / max 1 (fromIntegral (length label)) / 10.8))
-      approxWidth = fromIntegral (length label) * 54 * scaleText
-      x = negate (approxWidth / 2)
-      y = -8
-   in Pictures
-        [ Translate (x + 1.5) (y - 1.5) $ Scale scaleText scaleText $ Color (withAlpha 0.22 black) $ Text label,
-          Translate x y $ Scale scaleText scaleText $ Color textColor $ Text label
-        ]
+  let glyphPixel
+        | buttonWidth <= 52 = 2.6
+        | buttonWidth <= 72 = 2.7
+        | buttonWidth <= 96 = 2.8
+        | otherwise = 3.0
+   in drawUITextCentered 0 8 glyphPixel textColor label

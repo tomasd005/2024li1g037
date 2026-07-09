@@ -22,7 +22,8 @@ reageTempo segundos estado@ImmutableTowers {modo = EmJogo} =
       jogoAtualizado = atualizaJogo segundosFloat jogoAtual
       tempoNovo = tempoAtual + segundos
       mensagensAtualizadas = atualizaMensagens segundos (mensagensUI estado)
-      estadoAtualizado = atualizaInputContinuo segundos estado {jogo = jogoAtualizado, tempo = tempoNovo, mensagensUI = mensagensAtualizadas}
+      efeitosAtualizados = atualizaEfeitosUpgrade segundos (efeitosUpgrade estado)
+      estadoAtualizado = atualizaInputContinuo segundos estado {jogo = jogoAtualizado, tempo = tempoNovo, mensagensUI = mensagensAtualizadas, efeitosUpgrade = efeitosAtualizados}
       partidaLimpa = vidaBase (baseJogo jogoAtualizado) > 0
         && null (inimigosJogo jogoAtualizado)
         && all (null . inimigosOnda) (concatMap ondasPortal (portaisJogo jogoAtualizado))
@@ -33,10 +34,11 @@ reageTempo segundos estado@ImmutableTowers {modo = EmJogo} =
         else return estadoAtualizado
 reageTempo segundos estado =
   return $
-    atualizaInputContinuo segundos $
+        atualizaInputContinuo segundos $
       estado
         { tempo = tempo estado + segundos,
-          mensagensUI = atualizaMensagens segundos (mensagensUI estado)
+          mensagensUI = atualizaMensagens segundos (mensagensUI estado),
+          efeitosUpgrade = atualizaEfeitosUpgrade segundos (efeitosUpgrade estado)
         }
 
 atualizaMensagens :: Tempo -> [MensagemUI] -> [MensagemUI]
@@ -44,6 +46,12 @@ atualizaMensagens segundos =
   take 4 . filter ((> 0) . tempoMensagem) . map reduz
   where
     reduz msg = msg {tempoMensagem = tempoMensagem msg - segundos}
+
+atualizaEfeitosUpgrade :: Tempo -> [EfeitoUpgradeUI] -> [EfeitoUpgradeUI]
+atualizaEfeitosUpgrade segundos =
+  filter ((> 0) . tempoEfeitoUpgrade) . map reduzir
+  where
+    reduzir efeito = efeito {tempoEfeitoUpgrade = tempoEfeitoUpgrade efeito - segundos}
 
 atualizaInputContinuo :: Tempo -> ImmutableTowers -> ImmutableTowers
 atualizaInputContinuo segundos estado

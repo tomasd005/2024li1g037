@@ -15,14 +15,18 @@ module TowerSystem
     valorVendaTorre,
     mesmoModeloTorre,
     towerSpec,
+    towerSpecAproximada,
     towerSpecsOrdenadas,
     raridadeTorre,
     nomeTorre,
+    raridadeTorreAproximada,
     abrirBau,
     tentaFundirTempestade,
   )
 where
 
+import Data.List (minimumBy)
+import Data.Function (on)
 import ImmutableTowers (ModoJogoEscolhido (..))
 import LI12425
 import MetaTypes
@@ -67,6 +71,24 @@ raridadeTorre = raridadeTowerSpec . towerSpec
 
 nomeTorre :: TowerId -> String
 nomeTorre = nomeTowerSpec . towerSpec
+
+towerSpecAproximada :: Torre -> TowerSpec
+towerSpecAproximada torre =
+  minimumBy (compare `on` distanciaSpec)
+    [ spec
+    | spec <- towerSpecsOrdenadas
+    , tipoProjetil (projetilTorre (torreBaseSpec spec)) == tipoProjetil (projetilTorre torre)
+    ]
+  where
+    distanciaSpec spec =
+      let base = torreBaseSpec spec
+       in abs (danoTorre torre - danoTorre base)
+          + abs (alcanceTorre torre - alcanceTorre base) * 4
+          + abs (cicloTorre torre - cicloTorre base) * 6
+          + fromIntegral (abs (rajadaTorre torre - rajadaTorre base)) * 8
+
+raridadeTorreAproximada :: Torre -> Raridade
+raridadeTorreAproximada = raridadeTowerSpec . towerSpecAproximada
 
 lojaParaModo :: ModoJogoEscolhido -> MetaProgress -> Loja
 lojaParaModo modoAtual meta =
