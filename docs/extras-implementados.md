@@ -1,4 +1,6 @@
-# Extras implementados
+# Immutable Towers - Extras Implementados
+
+Tags: #estado #extras
 
 Este documento resume as funcionalidades extra acrescentadas ao Immutable Towers.
 

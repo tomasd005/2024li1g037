@@ -173,7 +173,7 @@ aguaLago =
 
 aguaCruzamento =
   retangulo Agua 6 4 10 8
-    ++ retangulo Agua 24 16 29 20
+    ++ retangulo Agua 24 16 29 19
     ++ retangulo Agua 15 24 19 28
 
 aguaBastiao =

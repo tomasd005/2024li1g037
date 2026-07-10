@@ -1,4 +1,6 @@
-# Estado atual do jogo
+# Immutable Towers - Estado Atual
+
+Tags: #estado #hub
 
 Resumo vivo do estado jogavel atual do Immutable Towers.
 
@@ -54,7 +56,12 @@ O jogo encontra-se jogavel com menu principal, perfis locais, ranking local, var
 - as zonas de HUD, loja e painel lateral passaram a consumir input
 - a loja in-game passou para uma sidebar lateral esquerda em vez de ocupar o rodape
 - a barra inferior ficou mais leve para devolver leitura ao mapa
+- a barra superior deixou de ter o botao manual `GO`
+- as vagas passam agora a arrancar automaticamente quando existe uma nova onda pronta
 - o layout foi validado em testes com resolucoes representativas: 1280x720, 1600x900, 1920x1080 e 2560x1440
+- a partida passou a ter ecras de resultado dedicados para vitoria e derrota
+- a derrota mostra estatisticas antes de voltar ao menu
+- a vitoria permite repetir o nivel ou voltar ao menu
 
 ### Upgrades
 
@@ -70,6 +77,14 @@ O jogo encontra-se jogavel com menu principal, perfis locais, ranking local, var
 - isto resolve o bug em que alguns inimigos ficavam presos apos certos disparos
 - os disparos agora deixam um impacto visual mais claro no alvo
 - o feedback de dano ficou mais explicito com numeros flutuantes simples no inimigo atingido
+- o mapa `Cruzamento Solar` foi corrigido para remover agua em cima do caminho
+- a escolha de direcao dos inimigos foi ajustada para permitir inversao quando essa e a unica saida valida do trilho
+
+### Automacao e controlo
+
+- o bot automatico agora pode ser ativado no jogo
+- quando ativo, o bot consegue iniciar vagas, construir torres e melhorar torres por cooldown
+- o HUD mostra o estado atual do bot
 
 ## Estado dos testes
 

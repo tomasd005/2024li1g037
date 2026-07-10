@@ -1,9 +1,9 @@
 module UIRects
-  ( startWaveRect,
-    pauseRect,
+  ( pauseRect,
     speed1Rect,
     speed2Rect,
     speed4Rect,
+    autoBotRect,
     upgradeRect,
     sellRect,
     cancelRect,
@@ -12,6 +12,8 @@ module UIRects
     resumeRect,
     restartRect,
     menuRect,
+    resultMenuRect,
+    resultReplayRect,
     menuHeroRect,
     menuModeRect,
     menuShopRect,
@@ -33,24 +35,26 @@ where
 import ImmutableTowers (larguraJanela)
 import UIComponents
 
-startWaveRect, pauseRect, speed1Rect, speed2Rect, speed4Rect, upgradeRect, sellRect, cancelRect :: UIRect
-startWaveRect = UIRect 464 494 138 42
-pauseRect = UIRect 588 494 54 42
-speed1Rect = UIRect 648 494 52 42
-speed2Rect = UIRect 706 494 52 42
-speed4Rect = UIRect 764 494 56 42
+pauseRect, speed1Rect, speed2Rect, speed4Rect, autoBotRect, upgradeRect, sellRect, cancelRect :: UIRect
+pauseRect = UIRect 418 494 54 42
+speed1Rect = UIRect 476 494 52 42
+speed2Rect = UIRect 534 494 52 42
+speed4Rect = UIRect 592 494 56 42
+autoBotRect = UIRect 660 494 74 42
 upgradeRect = UIRect 772 (-66) 122 42
 sellRect = UIRect 772 (-116) 122 42
 cancelRect = UIRect 772 (-166) 122 42
 
 hudToggleRect, shopToggleRect :: UIRect
-hudToggleRect = UIRect 804 494 72 42
-shopToggleRect = UIRect 890 494 84 42
+hudToggleRect = UIRect 732 494 64 42
+shopToggleRect = UIRect 812 494 80 42
 
-resumeRect, restartRect, menuRect :: UIRect
+resumeRect, restartRect, menuRect, resultMenuRect, resultReplayRect :: UIRect
 resumeRect = UIRect 0 (-28) 190 52
 restartRect = UIRect 0 (-92) 190 52
 menuRect = UIRect 0 (-156) 190 52
+resultMenuRect = UIRect (-108) (-156) 190 52
+resultReplayRect = UIRect 108 (-156) 190 52
 
 menuHeroRect, menuModeRect, menuShopRect, menuProfileRect, menuLeaderboardRect, menuHelpRect, menuOptionsRect, menuExitRect :: UIRect
 menuHeroRect = UIRect (-520) 132 280 68

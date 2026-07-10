@@ -52,6 +52,8 @@ desenha e = case modo e of
   MenuInicial opcao -> return $ desenhaMenu e opcao
   Pausado -> return $ desenhaPausado e
   EmJogo -> return $ desenhaJogoCompleto e
+  TelaVitoria -> return $ desenhaResultadoPartida e
+  TelaDerrota -> return $ desenhaResultadoPartida e
   TutorialFoto -> return desenhaTutorial
   MostrarCreditos -> return desenhaCreditos
   MostrarPerfil -> return $ desenhaPerfil e
@@ -86,7 +88,6 @@ desenhaJogoCompleto e =
         if hudCompacto e then Blank else desenhaPainelLateral e,
         if lojaVisivel e then desenhaLoja e else Blank,
         desenhaMensagens e,
-        desenhaGameOver e,
         if hudCompacto e then Blank else desenhaInstrucoes e
       ]
   ]
@@ -211,6 +212,7 @@ desenhaSelecionarModo e =
 desenhaOpcoes :: ImmutableTowers -> Picture
 desenhaOpcoes e =
   let rato = posicaoRato e
+      (rw, rh) = janelaAtual e
    in Pictures [
         Color (makeColorI 18 28 24 255) $ rectangleSolid (viewW e) (viewH e),
         desenhaFundoAnimado e,
@@ -219,10 +221,14 @@ desenhaOpcoes e =
             [ drawPanel (UIRect 0 40 820 590),
               drawTituloMenu (-336) 290 "Opções" "",
               drawSubtituloMenu (-335) 220 "Interface adaptada a diferentes tamanhos de janela",
-              drawSectionText (-335) 162 "CONTROLOS PRINCIPAIS",
-              drawBodyText (-335) 118 "Mouse: comprar, construir, selecionar, melhorar e vender torres",
+              drawSectionText (-335) 170 "VIDEO",
+              drawBodyText (-335) 130 ("Resolucao atual: " ++ show rw ++ "x" ++ show rh),
+              drawBodyText (-335) 92 "Graficos: perfil Gloss 2D otimizado",
+              drawSectionText (-335) 28 "CONTROLOS PRINCIPAIS",
+              drawBodyText (-335) (-12) "Mouse: comprar, construir, selecionar, melhorar e vender torres",
+              drawBodyText (-335) (-50) "P pausa | X alterna 1x/2x/4x | A bot automatico | B acao rapida",
               drawBodyText (-335) 80 "P pausa | X alterna 1x/2x/4x | S/L guarda e carrega | B sugestão bot",
-              drawBodyText (-335) 42 "H recolhe HUD | K esconde loja | E abre editor | ESC volta",
+              drawBodyText (-335) (-88) "H recolhe HUD | K esconde loja | E abre editor | ESC volta",
               drawSectionText (-335) (-24) "DISTRIBUIÇÃO",
               drawBodyText (-335) (-66) "Assets em app/imagens. Release = exe + pasta app/imagens.",
               drawBodyText (-335) (-104) "Windows: cabal build e empacotar executável com as DLLs necessárias.",
@@ -812,9 +818,6 @@ desenhaHUD e =
         if modoJogoEscolhido e == ModoInfinito
           then "W" ++ show (max 1 (ondaAtualUI resumo))
           else "W" ++ show (ondaAtualUI resumo) ++ "/" ++ show (ondasTotaisUI resumo)
-      proximaTexto = case proximaOndaUI resumo of
-        Just proxima -> "NEXT " ++ show proxima
-        Nothing -> "LAST"
    in Pictures [
         painel,
         Color (makeColorI 65 75 61 255) $ Translate 0 y $ rectangleWire (larguraJanela - 48) 82,
@@ -823,7 +826,7 @@ desenhaHUD e =
         hudPill (-308) y 154 "VAGA" ondaValor (makeColorI 226 153 76 255),
         hudPill (-130) y 154 "RESTAM" (show (inimigosRestantesUI resumo)) corTextoSuave,
         hudPill 48 y 154 "VEL" speed (makeColorI 111 150 168 255),
-        drawGlossBody 206 (y - 18) 0.068 (makeColorI 154 164 146 255) ("Mapa " ++ nomeMapa (mapaAtual e) ++ "  |  " ++ proximaTexto)
+        hudPill 226 y 154 "BOT" (if botAutomatico e then "AUTO" else "MANUAL") (if botAutomatico e then makeColorI 135 174 111 255 else makeColorI 154 164 146 255)
       ]
 
 desenhaControlesJogo :: ImmutableTowers -> Picture
@@ -832,11 +835,11 @@ desenhaControlesJogo e =
       speed = velocidadeJogo e
       toneSpeed alvo = if abs (speed - alvo) < 0.1 then Primary else Neutral
    in Pictures [
-        drawButton rato startWaveRect Primary "GO",
         drawButton rato pauseRect Neutral "||",
         drawButton rato speed1Rect (toneSpeed 1) "1X",
         drawButton rato speed2Rect (toneSpeed 2) "2X",
         drawButton rato speed4Rect (toneSpeed 4) "4X",
+        drawButton rato autoBotRect (if botAutomatico e then Primary else Neutral) "AUTO",
         drawButton rato hudToggleRect Neutral "HUD",
         drawButton rato shopToggleRect Neutral "LOJA"
       ]
@@ -1058,6 +1061,14 @@ showTempoCurto valor =
   let arredondado = fromIntegral (round (valor * 10) :: Int) / 10 :: Float
    in show arredondado
 
+showTempoPartida :: Float -> String
+showTempoPartida valor =
+  let totalSegundos = max 0 (floor valor :: Int)
+      minutos = totalSegundos `div` 60
+      segundos = totalSegundos `mod` 60
+      prefixo = if segundos < 10 then "0" else ""
+   in show minutos ++ ":" ++ prefixo ++ show segundos
+
 showDeltaFloat :: Float -> String
 showDeltaFloat valor =
   let arredondado = fromIntegral (round (valor * 10) :: Int) / 10 :: Float
@@ -1099,8 +1110,8 @@ hudPill x y w etiqueta valor corValor =
     Pictures
       [ Color (withAlpha 0.24 corValor) $ rectangleSolid w 48,
         Color (withAlpha 0.55 corValor) $ rectangleWire w 48,
-        Translate (-w / 2 + 14) 6 $ Scale 0.085 0.085 $ Color (makeColorI 176 184 171 255) $ Text etiqueta,
-        Translate (-w / 2 + 72) (-6) $ Scale 0.16 0.16 $ Color corValor $ Text valor
+        drawUITextLeft (-w / 2 + 14) 9 2.2 (makeColorI 176 184 171 255) etiqueta,
+        drawUITextLeft (-w / 2 + 72) (-4) 3.1 corValor valor
       ]
 
 mostraVaga :: WaveSummary -> ModoJogoEscolhido -> String
@@ -1112,26 +1123,63 @@ mostraVaga resumo modoAtual
 -- GAME OVER (VITÓRIA/DERROTA)
 -- ============================================================================
 
-desenhaGameOver :: ImmutableTowers -> Picture
-desenhaGameOver e =
-  let base = baseJogo (jogo e)
-      inimigos = inimigosJogo (jogo e)
-      ondasRestantes = concatMap ondasPortal (portaisJogo (jogo e))
-      
-      ganhou = vidaBase base > 0 && null inimigos && all (null . inimigosOnda) ondasRestantes
-      perdeu = vidaBase base <= 0
-   
-   in if ganhou then desenhaVitoria
-      else if perdeu then desenhaDerrota
-      else Blank
+desenhaResultadoPartida :: ImmutableTowers -> Picture
+desenhaResultadoPartida e =
+  Pictures
+    [ desenhaJogoCompleto (e {modo = EmJogo}),
+      Color (withAlpha 0.84 black) $ rectangleSolid larguraJanela alturaJanela,
+      case ultimoResumoPartida e of
+        Nothing -> desenhaPainelResultadoFallback e
+        Just resumo -> desenhaPainelResultado e resumo
+    ]
 
-desenhaVitoria :: Picture
-desenhaVitoria =
-  desenhaOverlayEstado "VITORIA" (makeColorI 135 174 111 255) "A base resistiu a todas as ondas." "ESC para sair"
+desenhaPainelResultadoFallback :: ImmutableTowers -> Picture
+desenhaPainelResultadoFallback e =
+  Pictures
+    [ drawPanel (UIRect 0 (-18) 600 320),
+      drawTituloMenu (-196) 98 "RESULTADO" "",
+      drawBodyText (-196) 20 "Resumo da partida indisponivel.",
+      drawButton (posicaoRato e) resultMenuRect Danger "MENU"
+    ]
 
-desenhaDerrota :: Picture
-desenhaDerrota =
-  desenhaOverlayEstado "DERROTA" (makeColorI 190 82 72 255) "A base foi destruida." "ESC para sair"
+desenhaPainelResultado :: ImmutableTowers -> ResumoPartida -> Picture
+desenhaPainelResultado e resumo =
+  let venceu = resultadoPartidaResumo resumo == PartidaVitoria
+      titulo = if venceu then "VITORIA" else "DERROTA"
+      subtitulo =
+        if venceu
+          then "A base resistiu. Podes repetir o nivel ou voltar ao menu."
+          else "A base caiu. O resumo fica visivel antes de voltar ao menu."
+      corTitulo = if venceu then makeColorI 135 174 111 255 else makeColorI 190 82 72 255
+      linhas =
+        [ "Modo: " ++ nomeModoJogo (modoPartidaResumo resumo),
+          "Mapa: " ++ nomeMapa (mapaPartidaResumo resumo),
+          "Tempo: " ++ showTempoPartida (tempoPartidaResumo resumo),
+          "Pontuacao: " ++ show (pontuacaoPartidaResumo resumo),
+          "Ondas: " ++ show (ondasPartidaResumo resumo),
+          "Creditos finais: " ++ show (creditosPartidaResumo resumo),
+          "Torres no mapa: " ++ show (torresPartidaResumo resumo)
+        ]
+   in Pictures
+        [ drawPanel (UIRect 0 (-8) 760 430),
+          drawTituloMenu (-254) 158 titulo "",
+          drawGlossBody (-252) 112 0.088 corTextoSuave subtitulo,
+          Color (withAlpha 0.18 corTitulo) $ Translate 0 76 $ rectangleSolid 684 2,
+          Pictures
+            [ drawBodyText (-252) (68 - fromIntegral i * 42) linha
+            | (i, linha) <- zip [0 :: Int ..] linhas
+            ],
+          if venceu
+            then Pictures
+              [ drawButton (posicaoRato e) resultMenuRect Danger "MENU",
+                drawButton (posicaoRato e) resultReplayRect Primary "REPETIR",
+                drawBodyText (-120) (-202) "ESC volta ao menu  |  ENTER repete o nivel"
+              ]
+            else Pictures
+              [ drawButton (posicaoRato e) resultMenuRect Danger "MENU",
+                drawBodyText (-132) (-202) "ESC ou ENTER voltam ao menu inicial"
+              ]
+        ]
 
 desenhaPausado :: ImmutableTowers -> Picture
 desenhaPausado e =
@@ -1260,7 +1308,7 @@ carregarImagens = do
       
       (jogoInicial, mapaInicial, totalOndas, metaInicialJogo) = prepararPartida modoGuardado metaGuardado
   
-  return $ ImmutableTowers jogoInicial imgs (MenuInicial Jogar) 0 (round larguraJanela, round alturaJanela) Nothing Nothing Nothing perfilGuardado leaderboardGuardada metaInicialJogo modoGuardado mapaInicial 0 totalOndas False 1 [] False True [] False 0
+  return $ ImmutableTowers jogoInicial imgs (MenuInicial Jogar) 0 (round larguraJanela, round alturaJanela) Nothing Nothing Nothing perfilGuardado leaderboardGuardada metaInicialJogo modoGuardado mapaInicial 0 totalOndas False 1 [] False True [] Nothing False 0 False 0
 
 ratoParaCelula :: MapLayoutConfig -> Mapa -> (Float, Float) -> Maybe (Int, Int, Float, Float)
 ratoParaCelula cfg mapa (mx, my) =

@@ -60,11 +60,11 @@ topBarRect = UIRect 0 (alturaJanela / 2 - 42) (larguraJanela - 48) 82
 
 topControls :: [UIRect]
 topControls =
-  [ startWaveRect,
-    pauseRect,
+  [ pauseRect,
     speed1Rect,
     speed2Rect,
     speed4Rect,
+    autoBotRect,
     hudToggleRect,
     shopToggleRect
   ]

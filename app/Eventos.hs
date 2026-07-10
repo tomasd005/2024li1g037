@@ -76,6 +76,8 @@ reage (EventKey (SpecialKey KeyEnter) Down _ _) e =
     MostrarLojaMeta -> return e {modo = MenuInicial LojaMeta}
     SelecionarModo -> return e {modo = MenuInicial Modos}
     EditorMapa -> return e {modo = MenuInicial Modos}
+    TelaVitoria -> return (reiniciarMesmoNivel e)
+    TelaDerrota -> return (voltarAoMenuPosPartida e)
     _ -> return e
 reage (EventKey (Char 'e') Down _ _) e =
   case modo e of
@@ -105,6 +107,8 @@ reage (EventKey (SpecialKey KeyEsc) Down _ _) e =
     EditorMapa -> return e {modo = MenuInicial Modos}
     EmJogo -> return e {modo = Pausado}
     Pausado -> return e {modo = EmJogo}
+    TelaVitoria -> return (voltarAoMenuPosPartida e)
+    TelaDerrota -> return (voltarAoMenuPosPartida e)
     _ -> return e
 reage (EventKey (Char 'p') Down _ _) e =
   case modo e of
@@ -124,6 +128,10 @@ reage (EventKey (Char 'h') Down _ _) e =
 reage (EventKey (Char 'k') Down _ _) e =
   case modo e of
     EmJogo -> return e {lojaVisivel = not (lojaVisivel e)}
+    _ -> return e
+reage (EventKey (Char 'a') Down _ _) e =
+  case modo e of
+    EmJogo -> return (toggleBotAutomatico e)
     _ -> return e
 reage (EventKey (Char '1') Down _ _) e@ImmutableTowers {modo = MostrarLojaMeta, progressoMeta = meta} = do
   let (metaNovo, texto) = abrirBau BauMadeira meta
@@ -194,6 +202,16 @@ reage (EventKey (MouseButton LeftButton) Down _ posBruto) estado@ImmutableTowers
    in return $ case acaoPausaClicada pos estado of
     Just novoEstado -> novoEstado
     Nothing -> estado
+reage (EventKey (MouseButton LeftButton) Down _ posBruto) estado@ImmutableTowers {modo = TelaVitoria} =
+  let pos = normalizaUIPos estado posBruto
+   in return $ case acaoResultadoClicada pos estado of
+    Just novoEstado -> novoEstado
+    Nothing -> estado
+reage (EventKey (MouseButton LeftButton) Down _ posBruto) estado@ImmutableTowers {modo = TelaDerrota} =
+  let pos = normalizaUIPos estado posBruto
+   in return $ case acaoResultadoClicada pos estado of
+    Just novoEstado -> novoEstado
+    Nothing -> estado
 reage _ estado = return estado
 
 apagarCaracterPerfil :: Bool -> ImmutableTowers -> IO ImmutableTowers
@@ -210,11 +228,11 @@ apagarCaracterPerfil ativar estado =
 
 acaoJogoClicada :: (Float, Float) -> ImmutableTowers -> Maybe ImmutableTowers
 acaoJogoClicada pos estado
-  | pos `containsPoint` startWaveRect = Just (adicionaMensagem MsgInfo "Vaga iniciada" (iniciaProximaVaga estado))
   | pos `containsPoint` pauseRect = Just estado {modo = Pausado}
   | pos `containsPoint` speed1Rect = Just (adicionaMensagem MsgInfo "Velocidade 1x" estado {velocidadeJogo = 1})
   | pos `containsPoint` speed2Rect = Just (adicionaMensagem MsgInfo "Velocidade 2x" estado {velocidadeJogo = 2})
   | pos `containsPoint` speed4Rect = Just (adicionaMensagem MsgInfo "Velocidade 4x" estado {velocidadeJogo = 4})
+  | pos `containsPoint` autoBotRect = Just (toggleBotAutomatico estado)
   | pos `containsPoint` hudToggleRect = Just estado {hudCompacto = not (hudCompacto estado)}
   | pos `containsPoint` shopToggleRect = Just estado {lojaVisivel = not (lojaVisivel estado)}
   | not (hudCompacto estado) && pos `containsPoint` upgradeRect = Just (upgradeSelecionada estado (jogo estado) (torreFocada estado))
@@ -229,22 +247,21 @@ acaoPausaClicada pos estado
   | pos `containsPoint` menuRect = Just estado {modo = MenuInicial Jogar, torreSelecionada = Nothing, torreFocada = Nothing}
   | otherwise = Nothing
 
+acaoResultadoClicada :: (Float, Float) -> ImmutableTowers -> Maybe ImmutableTowers
+acaoResultadoClicada pos estado@ImmutableTowers {modo = TelaVitoria}
+  | pos `containsPoint` resultMenuRect = Just (voltarAoMenuPosPartida estado)
+  | pos `containsPoint` resultReplayRect = Just (reiniciarMesmoNivel estado)
+  | otherwise = Nothing
+acaoResultadoClicada pos estado@ImmutableTowers {modo = TelaDerrota}
+  | pos `containsPoint` resultMenuRect = Just (voltarAoMenuPosPartida estado)
+  | otherwise = Nothing
+acaoResultadoClicada _ _ = Nothing
+
 proximaVelocidade :: Float -> Float
 proximaVelocidade velocidade
   | velocidade < 2 = 2
   | velocidade < 4 = 4
   | otherwise = 1
-
-iniciaProximaVaga :: ImmutableTowers -> ImmutableTowers
-iniciaProximaVaga estado =
-  let jogoAtual = jogo estado
-      portaisAtualizados = map iniciaPortal (portaisJogo jogoAtual)
-   in estado {jogo = jogoAtual {portaisJogo = portaisAtualizados}}
-  where
-    iniciaPortal portal =
-      case ondasPortal portal of
-        [] -> portal
-        onda : ondas -> portal {ondasPortal = onda {entradaOnda = 0, tempoOnda = 0} : ondas}
 
 vendeTorreSelecionada :: ImmutableTowers -> ImmutableTowers
 vendeTorreSelecionada estado =
@@ -292,8 +309,30 @@ iniciarPartida e =
               resultadoRegistado = False,
               velocidadeJogo = 1,
               mensagensUI = [],
-              efeitosUpgrade = []
+              efeitosUpgrade = [],
+              ultimoResumoPartida = Nothing,
+              botAutomatico = False,
+              botCooldown = 0
             }
+
+reiniciarMesmoNivel :: ImmutableTowers -> ImmutableTowers
+reiniciarMesmoNivel = iniciarPartida
+
+voltarAoMenuPosPartida :: ImmutableTowers -> ImmutableTowers
+voltarAoMenuPosPartida estado =
+  estado
+    { modo = MenuInicial Jogar,
+      torreSelecionada = Nothing,
+      torreFocada = Nothing,
+      botAutomatico = False,
+      botCooldown = 0
+    }
+
+toggleBotAutomatico :: ImmutableTowers -> ImmutableTowers
+toggleBotAutomatico estado =
+  let ativo = not (botAutomatico estado)
+      texto = if ativo then "Bot automatico ligado" else "Bot automatico desligado"
+   in adicionaMensagem MsgInfo texto estado {botAutomatico = ativo, botCooldown = 0.1}
 
 upgradeSelecionada :: ImmutableTowers -> Jogo -> Maybe Posicao -> ImmutableTowers
 upgradeSelecionada estado jogoAtual foco =

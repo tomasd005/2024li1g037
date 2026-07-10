@@ -399,12 +399,16 @@ proximaDirecao mapa pos direcaoAtual =
   let vizinhos = vizinhosValidos mapa pos
       direcaoOposta = getDirecaoOposta direcaoAtual
       direcoesPermitidas = filter (\(d, _) -> d /= direcaoOposta) vizinhos
-   in case direcoesPermitidas of
-        [] -> direcaoAtual
-        primeiraDirecao : _ ->
-          case filter (\(d, _) -> d == direcaoAtual) direcoesPermitidas of
+      direcaoAtualValida = filter (\(d, _) -> d == direcaoAtual) direcoesPermitidas
+   in case direcaoAtualValida of
+        (d, _) : _ -> d
+        [] ->
+          case direcoesPermitidas of
             (d, _) : _ -> d
-            [] -> fst primeiraDirecao
+            [] ->
+              case vizinhos of
+                (d, _) : _ -> d
+                [] -> direcaoAtual
 
 -- | Retorna vizinhos válidos (em terra).
 --

@@ -103,6 +103,9 @@ testesTarefa3 =
         "proximaDirecao - mantém direção válida" ~:
           let dir = proximaDirecao mapa1 (1.0, 1.0) Este
            in dir `elem` [Norte, Sul, Este, Oeste] ~=? True,
+
+        "proximaDirecao - aceita inverter quando e a unica saida valida" ~:
+          proximaDirecao mapaCorredorReverso (2.0, 1.0) Este ~=? Oeste,
         
         "vizinhosValidos - retorna vizinhos em terra" ~:
           length (vizinhosValidos mapa1 (1.0, 1.0)) >= 0 ~=? True,
@@ -163,6 +166,13 @@ testesTarefa3 =
 -- Exemplo de inimigos
 -- Tipo Tempo
 type Tempo = Float -- em segundos
+
+mapaCorredorReverso :: Mapa
+mapaCorredorReverso =
+  [ [Relva, Relva, Relva],
+    [Terra, Terra, Terra],
+    [Relva, Relva, Relva]
+  ]
 
 -- Exemplos de ondas
 onda1 :: Onda

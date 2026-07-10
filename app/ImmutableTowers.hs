@@ -28,6 +28,9 @@ data ImmutableTowers = ImmutableTowers
     hudCompacto :: Bool,
     lojaVisivel :: Bool,
     efeitosUpgrade :: [EfeitoUpgradeUI],
+    ultimoResumoPartida :: Maybe ResumoPartida,
+    botAutomatico :: Bool,
+    botCooldown :: Float,
     backspacePerfilAtivo :: Bool,
     backspacePerfilTimer :: Float
   }
@@ -45,6 +48,23 @@ data MensagemUI = MensagemUI
 data EfeitoUpgradeUI = EfeitoUpgradeUI
   { posicaoEfeitoUpgrade :: Posicao,
     tempoEfeitoUpgrade :: Float
+  }
+  deriving (Show, Read, Eq)
+
+data ResultadoPartida
+  = PartidaVitoria
+  | PartidaDerrota
+  deriving (Show, Read, Eq)
+
+data ResumoPartida = ResumoPartida
+  { resultadoPartidaResumo :: ResultadoPartida,
+    tempoPartidaResumo :: Float,
+    pontuacaoPartidaResumo :: Int,
+    ondasPartidaResumo :: Int,
+    creditosPartidaResumo :: Int,
+    torresPartidaResumo :: Int,
+    mapaPartidaResumo :: MapId,
+    modoPartidaResumo :: ModoJogoEscolhido
   }
   deriving (Show, Read, Eq)
 
@@ -118,6 +138,8 @@ data MenuInicialOpcoes
 data Modo
   = MenuInicial MenuInicialOpcoes
   | EmJogo
+  | TelaVitoria
+  | TelaDerrota
   | TutorialFoto
   | MostrarCreditos
   | MostrarPerfil

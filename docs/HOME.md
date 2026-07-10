@@ -1,11 +1,17 @@
 # Immutable Towers - Home
 
+Tags: #hub #vault
+
 Ponto de entrada do vault no Obsidian.
 
 ## Comecar por aqui
 
 - [[estado-atual]]
+- [[roadmap-atual]]
 - [[backlog-jogo]]
+- [[changelog-jogavel]]
+- [[checklist-regressao]]
+- [[template-playtest]]
 - [[feedback-jogo-lei120arch-2026-07-08]]
 - [[extras-implementados]]
 - [[etapa5-roadmap-features]]
@@ -15,6 +21,7 @@ Ponto de entrada do vault no Obsidian.
 - [[sistema-inimigos]]
 - [[sistema-ondas]]
 - [[sistema-progressao]]
+- [[guia-vault]]
 
 ## Como ler o vault
 
@@ -25,8 +32,15 @@ Ponto de entrada do vault no Obsidian.
 
 ### Se quiseres perceber o que ainda falta
 
-1. [[backlog-jogo]]
-2. [[etapa5-roadmap-features]]
+1. [[roadmap-atual]]
+2. [[backlog-jogo]]
+3. [[etapa5-roadmap-features]]
+
+### Se quiseres preparar testes ou entrega
+
+1. [[checklist-regressao]]
+2. [[changelog-jogavel]]
+3. [[distribuicao]]
 
 ### Se quiseres ver bugs e feedback real
 
@@ -37,7 +51,12 @@ Ponto de entrada do vault no Obsidian.
 
 - `HOME.md`: entrada principal
 - `estado-atual.md`: resumo vivo do estado jogavel atual
+- `roadmap-atual.md`: prioridades apresentaveis do projeto
 - `backlog-jogo.md`: apenas tarefas em aberto
+- `changelog-jogavel.md`: mudancas sentidas no jogo
+- `checklist-regressao.md`: validacao rapida antes de bundle/commit
+- `template-playtest.md`: modelo para feedback novo
+- `guia-vault.md`: convencoes de organizacao do Obsidian
 - `feedback-jogo-lei120arch-2026-07-08.md`: feedback de playtest organizado
 - `extras-implementados.md`: resumo das features ja feitas
 - `etapa5-roadmap-features.md`: direcao e ideias futuras

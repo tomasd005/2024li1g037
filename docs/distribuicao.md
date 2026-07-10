@@ -1,4 +1,6 @@
-# Distribuicao do Immutable Towers
+# Immutable Towers - Distribuicao
+
+Tags: #release #bundle
 
 ## Estrutura recomendada
 

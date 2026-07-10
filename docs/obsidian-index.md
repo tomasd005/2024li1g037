@@ -1,4 +1,6 @@
-# Immutable Towers Vault
+# Immutable Towers - Index Antigo
+
+Tags: #hub #arquivo
 
 Esta nota passou a ser apenas um apontador simples.
 

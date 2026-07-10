@@ -1,5 +1,6 @@
 module Tempo where
 
+import BotSystem
 import Data.List (sortOn)
 import ImmutableTowers
 import LI12425
@@ -23,7 +24,10 @@ reageTempo segundos estado@ImmutableTowers {modo = EmJogo} =
       tempoNovo = tempoAtual + segundos
       mensagensAtualizadas = atualizaMensagens segundos (mensagensUI estado)
       efeitosAtualizados = atualizaEfeitosUpgrade segundos (efeitosUpgrade estado)
-      estadoAtualizado = atualizaInputContinuo segundos estado {jogo = jogoAtualizado, tempo = tempoNovo, mensagensUI = mensagensAtualizadas, efeitosUpgrade = efeitosAtualizados}
+      estadoBase =
+        atualizaBotAutomatico segundos $
+          atualizaInputContinuo segundos estado {jogo = jogoAtualizado, tempo = tempoNovo, mensagensUI = mensagensAtualizadas, efeitosUpgrade = efeitosAtualizados}
+      estadoAtualizado = autoIniciaVagaSeNecessario estadoBase
       partidaLimpa = vidaBase (baseJogo jogoAtualizado) > 0
         && null (inimigosJogo jogoAtualizado)
         && all (null . inimigosOnda) (concatMap ondasPortal (portaisJogo jogoAtualizado))
@@ -70,6 +74,46 @@ atualizaInputContinuo segundos estado
                       backspacePerfilTimer = 0.055
                     }
 
+atualizaBotAutomatico :: Tempo -> ImmutableTowers -> ImmutableTowers
+atualizaBotAutomatico segundos estado
+  | modo estado /= EmJogo = estado {botCooldown = 0}
+  | not (botAutomatico estado) = estado {botCooldown = 0}
+  | otherwise =
+      let cooldownNovo = botCooldown estado - segundos
+       in if cooldownNovo > 0
+            then estado {botCooldown = cooldownNovo}
+            else
+              case botExecutaAcao (jogo estado) of
+                Just (jogoNovo, texto) ->
+                  adicionaMensagemTempo MsgInfo texto estado {jogo = jogoNovo, botCooldown = 0.85}
+                Nothing ->
+                  estado {botCooldown = 0.35}
+
+autoIniciaVagaSeNecessario :: ImmutableTowers -> ImmutableTowers
+autoIniciaVagaSeNecessario estado
+  | modo estado /= EmJogo = estado
+  | not (haVagaPendentePronta (jogo estado)) = estado
+  | otherwise =
+      let portaisAtualizados = map iniciaPortal (portaisJogo (jogo estado))
+          jogoNovo = (jogo estado) {portaisJogo = portaisAtualizados}
+       in adicionaMensagemTempo MsgInfo "Nova vaga iniciada" estado {jogo = jogoNovo}
+  where
+    haVagaPendentePronta jogoAtual =
+      null (inimigosJogo jogoAtual)
+        && any temOndaPorComecar (portaisJogo jogoAtual)
+    temOndaPorComecar portal =
+      case ondasPortal portal of
+        [] -> False
+        onda : _ -> not (null (inimigosOnda onda)) && entradaOnda onda > 0
+    iniciaPortal portal =
+      case ondasPortal portal of
+        [] -> portal
+        onda : ondas -> portal {ondasPortal = onda {entradaOnda = 0, tempoOnda = 0} : ondas}
+
+adicionaMensagemTempo :: TipoMensagem -> String -> ImmutableTowers -> ImmutableTowers
+adicionaMensagemTempo tipo texto estado =
+  estado {mensagensUI = MensagemUI texto 2.4 tipo : take 3 (mensagensUI estado)}
+
 partidaTerminou :: Jogo -> Bool
 partidaTerminou jogoAtual =
   vidaBase (baseJogo jogoAtual) <= 0
@@ -107,7 +151,28 @@ registaResultado estado = do
               { gemasJogador = gemasJogador metaAtual + recompensaVitoriaModo (modoJogoEscolhido estado) metaAtual,
                 nivelJogadorMeta = max (nivelJogadorMeta metaAtual) (1 + (estagiosConcluidos metaAtual + vitoriasJogador perfilAtualizado) `div` 2)
               }
+      resumo =
+        ResumoPartida
+          { resultadoPartidaResumo = if ganhou then PartidaVitoria else PartidaDerrota,
+            tempoPartidaResumo = tempo estado,
+            pontuacaoPartidaResumo = score,
+            ondasPartidaResumo = max (ondasSobrevividas estado) (totalOndasPartida estado),
+            creditosPartidaResumo = creditosBase (baseJogo (jogo estado)),
+            torresPartidaResumo = length (torresJogo (jogo estado)),
+            mapaPartidaResumo = mapaAtual estado,
+            modoPartidaResumo = modoJogoEscolhido estado
+          }
       entrada = Pontuacao (nomeJogador perfil) (modoJogoEscolhido estado) score (max (ondasSobrevividas estado) (totalOndasPartida estado))
       leaderboardAtualizada = take 10 $ sortOn (negate . valorPontuacao) (entrada : leaderboardLocal estado)
   guardarMetaEstado perfilAtualizado leaderboardAtualizada (modoJogoEscolhido estado) metaComRecompensa
-  return estado {perfilJogador = perfilAtualizado, leaderboardLocal = leaderboardAtualizada, progressoMeta = metaComRecompensa, resultadoRegistado = True}
+  return
+    estado
+      { perfilJogador = perfilAtualizado,
+        leaderboardLocal = leaderboardAtualizada,
+        progressoMeta = metaComRecompensa,
+        resultadoRegistado = True,
+        ultimoResumoPartida = Just resumo,
+        modo = if ganhou then TelaVitoria else TelaDerrota,
+        botAutomatico = False,
+        botCooldown = 0
+      }

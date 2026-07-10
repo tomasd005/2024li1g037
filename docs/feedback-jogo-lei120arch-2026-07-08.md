@@ -1,4 +1,6 @@
-# Feedback de jogo - LEI 120 Arch - 2026-07-08
+# Immutable Towers - Feedback LEI 120 Arch - 2026-07-08
+
+Tags: #feedback #playtest
 
 Feedback informal recolhido durante uma sessao de teste ao jogo.
 
