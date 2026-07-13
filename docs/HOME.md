@@ -14,7 +14,6 @@ Ponto de entrada do vault no Obsidian.
 - [[template-playtest]]
 - [[feedback-jogo-lei120arch-2026-07-08]]
 - [[extras-implementados]]
-- [[etapa5-roadmap-features]]
 - [[distribuicao]]
 - [[sistema-ui]]
 - [[sistema-torres]]
@@ -34,7 +33,6 @@ Ponto de entrada do vault no Obsidian.
 
 1. [[roadmap-atual]]
 2. [[backlog-jogo]]
-3. [[etapa5-roadmap-features]]
 
 ### Se quiseres preparar testes ou entrega
 
@@ -59,7 +57,6 @@ Ponto de entrada do vault no Obsidian.
 - `guia-vault.md`: convencoes de organizacao do Obsidian
 - `feedback-jogo-lei120arch-2026-07-08.md`: feedback de playtest organizado
 - `extras-implementados.md`: resumo das features ja feitas
-- `etapa5-roadmap-features.md`: direcao e ideias futuras
 - `distribuicao.md`: build, bundle e entrega
 
 ## Regra de manutencao

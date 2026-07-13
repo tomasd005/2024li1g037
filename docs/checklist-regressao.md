@@ -15,6 +15,7 @@ Relacionadas:
 - abrir o jogo e confirmar que o menu principal aparece bem
 - navegar entre botoes com rato e teclado
 - abrir perfil, ranking, ajuda, opcoes e modos
+- clicar em `Voltar` na Loja e nos restantes submenus
 - confirmar que o texto principal esta legivel
 
 ## Perfil e progresso
@@ -42,6 +43,8 @@ Relacionadas:
 - selecionar torre colocada
 - ver stats no painel lateral
 - confirmar preview de upgrade
+- chegar ao nivel de especializacao e testar `DANO+` e `RAPIDA`
+- confirmar que o nivel maximo bloqueia novos upgrades
 - fazer upgrade
 - confirmar feedback visual do upgrade
 - vender torre
@@ -53,6 +56,10 @@ Relacionadas:
 - confirmar que inimigos perdem vida
 - confirmar que aparecem numeros de dano
 - confirmar que inimigos com gelo/resina nao ficam presos para sempre
+- confirmar que inimigos rapidos que atravessam a base entre frames causam dano e desaparecem
+- confirmar que blindado/escudo recebem menos dano de forma percetivel
+- confirmar a aura do Guardiao e a zona do boss de Ruptura
+- confirmar que a proxima vaga aparece no painel
 
 ## Modos e velocidade
 
@@ -66,6 +73,13 @@ Relacionadas:
 - guardar jogo
 - carregar jogo
 - confirmar que o estado principal volta corretamente
+- confirmar que nivel, identidade e especializacao da torre sao preservados
+
+## Editor
+
+- tentar cortar o unico caminho entre portal e base
+- confirmar que a alteracao e rejeitada com mensagem
+- fazer uma alteracao segura e confirmar que e aplicada
 
 ## Build
 

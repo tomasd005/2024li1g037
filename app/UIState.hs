@@ -5,6 +5,8 @@ module UIState
 where
 
 import ImmutableTowers
+import qualified Data.IntMap.Strict as IntMap
+import EnemySystem
 import LI12425
 
 data WaveSummary = WaveSummary
@@ -12,7 +14,8 @@ data WaveSummary = WaveSummary
     ondasTotaisUI :: !Int,
     ondasRestantesUI :: !Int,
     inimigosRestantesUI :: !Int,
-    proximaOndaUI :: !(Maybe Int)
+    proximaOndaUI :: !(Maybe Int),
+    composicaoProximaUI :: [(EnemyClass, Int)]
   }
 
 waveSummary :: ImmutableTowers -> WaveSummary
@@ -28,13 +31,33 @@ waveSummary estado =
         | totalModo <= 0 = 0
         | restantes <= 0 = totalModo
         | otherwise = min totalModo (totalModo - restantes + 1)
-      proxima
-        | restantes <= 1 = Nothing
-        | otherwise = Just (min totalModo (ondaAtual + 1))
+      ondasComInimigos = filter (not . null . inimigosOnda) ondasRestantes
+      (ondaPreview, avancaPreview) = case ondasComInimigos of
+        [] -> (Nothing, False)
+        ondaAtualPendente : proximaPendente : _
+          | not (null ativos) && entradaOnda ondaAtualPendente <= 0 -> (Just proximaPendente, True)
+        onda : _ -> (Just onda, False)
+      proxima = case ondaPreview of
+        Nothing -> Nothing
+        Just _ -> Just (max 1 (min (max 1 totalModo) (ondaAtual + if avancaPreview then 1 else 0)))
+      composicao = maybe [] composicaoOnda ondaPreview
    in WaveSummary
         { ondaAtualUI = ondaAtual,
           ondasTotaisUI = totalModo,
           ondasRestantesUI = restantes,
           inimigosRestantesUI = inimigosRestantes,
-          proximaOndaUI = proxima
+          proximaOndaUI = proxima,
+          composicaoProximaUI = composicao
         }
+
+composicaoOnda :: Onda -> [(EnemyClass, Int)]
+composicaoOnda onda =
+  [ (enemyClass, quantidade)
+  | enemyClass <- [minBound .. maxBound],
+    let quantidade = IntMap.findWithDefault 0 (fromEnum enemyClass) contagens,
+    quantidade > 0
+  ]
+  where
+    contagens = foldl' conta IntMap.empty (inimigosOnda onda)
+    conta acumulador inimigo =
+      IntMap.insertWith (+) (fromEnum (enemyClassOf inimigo)) 1 acumulador

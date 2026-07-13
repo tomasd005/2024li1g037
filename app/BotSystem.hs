@@ -37,7 +37,7 @@ sugestaoBot jogoAtual
   | otherwise = "guardar"
   where
     base = baseJogo jogoAtual
-    custoUpgradeMaisBarato = minimum (map custoUpgradeTorre (torresJogo jogoAtual) ++ [9999])
+    custoUpgradeMaisBarato = foldl' min 9999 (map custoUpgradeTorre (torresJogo jogoAtual))
 
 deveIniciarOnda :: Jogo -> Bool
 deveIniciarOnda jogoAtual =

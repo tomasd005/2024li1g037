@@ -2,39 +2,47 @@
 
 Tags: #sistema #ondas
 
-Relacionadas:
+Relacionadas: [[HOME]], [[estado-atual]], [[sistema-inimigos]], [[backlog-jogo]]
 
-- [[HOME]]
-- [[estado-atual]]
+## Modulos
 
-## Responsabilidades
+- `app/WaveSystem.hs`: `EnemyGroup`, `WavePlan`, composicoes e mutadores
+- `app/ProgressionSystem.hs`: campanha, desbloqueios e total de vagas
+- `app/Tempo.hs`: spawn automatico e geracao do infinito
+- `app/UIState.hs`: resumo e composicao da proxima vaga
 
-- criar ondas
-- escalar dificuldade
-- gerir spawn de inimigos
-- suportar modos de jogo diferentes
+## Composicao
 
-## Modulos principais
+Uma `WavePlan` descreve grupos de classes e ciclo de spawn. Isto permite desenhar historia, desafio, boss e sandbox sem depender apenas de `indice mod n`.
 
-- `app/WaveSystem.hs`
-- `lib/Tarefa3.hs`
-- `app/UIState.hs`
-- `app/Tempo.hs`
+- Historia: dez vagas por estagio, dificuldade guiada pelo capitulo/estagio.
+- Infinito: uma vaga de cada vez, quantidade e nivel crescentes.
+- Desafio: misturas que exigem counters diferentes.
+- Boss: tres encontros com escoltas e bosses distintos.
+- Sandbox: amostra das classes normais para teste.
 
-## Estado atual
+## Mutadores do infinito
 
-- historia usa ondas mais guiadas
-- infinito gera novas ondas dinamicamente
-- desafio, boss e sandbox usam configuracoes diferentes
+- `Fortificados`: a cada quatro vagas, mais vida e ataque.
+- `RecompensaEscassa`: a cada seis vagas, menos butim.
+- `OndaDupla`: a cada nove vagas, duplica a composicao e acelera o spawn.
 
-## UI ligada ao sistema
+Os marcos podem coincidir, criando combinacoes previsiveis. O HUD mostra uma notificacao quando um mutador entra.
 
-- HUD mostra vaga atual
-- HUD mostra inimigos restantes
-- UIState calcula resumo das ondas para o render
+## Preview
 
-## Proximos melhoramentos
+`UIState` agrega a composicao da proxima vaga numa passagem e o painel mostra ate tres classes com contagens. O calculo fica fora das funcoes de desenho de modelos e evita multiplas pesquisas por classe.
 
-- variedade maior de composicao de ondas
-- bosses com comportamento proprio
-- tuning do modo infinito para escalar melhor no late game
+## Editor
+
+Cada alteracao e validada antes de ser aplicada. O editor rejeita:
+
+- base ou portal fora de Terra/Asfalto;
+- terreno invalido sob uma torre;
+- mapa sem caminho de qualquer portal ate a base.
+
+## Qualidade
+
+- ciclos de spawn sao limitados a valores positivos
+- mutadores e composicoes possuem testes unitarios
+- falta playtest de ritmo, pausas e economia em vagas longas

@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "sistema-progressao.md",
+                "file": "roadmap-atual.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "sistema-progressao"
+              "title": "roadmap-atual"
             }
           }
         ]
@@ -185,6 +185,9 @@
   },
   "active": "712501aea3ab0d91",
   "lastOpenFiles": [
+    "prompt-mestre-continuidade.md",
+    "template-playtest.md",
+    "sistema-progressao.md",
     "estado-atual.md",
     "HOME.md",
     "changelog-jogavel.md",
@@ -197,10 +200,8 @@
     "extras-implementados.md",
     "sistema-ui.md",
     "sistema-torres.md",
-    "sistema-progressao.md",
     "sistema-ondas.md",
     "sistema-inimigos.md",
-    "template-playtest.md",
     "guia-vault.md",
     "feedback-jogo-lei120arch-2026-07-08.md",
     "etapa5-roadmap-features.md"

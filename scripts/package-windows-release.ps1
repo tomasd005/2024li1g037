@@ -22,6 +22,8 @@ New-Item -ItemType Directory -Path (Join-Path $ReleaseRoot "app") | Out-Null
 
 Copy-Item -LiteralPath $ExeSource -Destination (Join-Path $ReleaseRoot "immutable-towers.exe")
 Copy-Item -LiteralPath $AssetSource -Destination (Join-Path $ReleaseRoot "app\imagens") -Recurse
+Copy-Item -LiteralPath (Join-Path $ProjectRoot "release\templates\run-game.bat") -Destination (Join-Path $ReleaseRoot "run-game.bat")
+Copy-Item -LiteralPath (Join-Path $ProjectRoot "release\templates\run-game.ps1") -Destination (Join-Path $ReleaseRoot "run-game.ps1")
 
 foreach ($dll in $DllCandidates) {
   $source = Join-Path $MinGwBin $dll

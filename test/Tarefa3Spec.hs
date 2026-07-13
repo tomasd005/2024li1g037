@@ -12,8 +12,18 @@ testesTarefa3 =
     test
       [ 
         -- Testes de atualizaJogo
-        "atualizaJogo - base perde vida quando inimigo chega" ~: 
+        "atualizaJogo - base perde vida quando inimigo chega" ~:
           vidaBase (baseJogo (atualizaJogo 1.0 jogoComInimigoNaBase)) < vidaBase (baseJogo jogoComInimigoNaBase) ~=? True,
+
+        "atualizaJogo - inimigo que atravessa a base causa dano" ~:
+          let resultado = atualizaJogo 1.0 jogoInimigoAtravessaBase
+           in vidaBase (baseJogo resultado) < vidaBase (baseJogo jogoInimigoAtravessaBase)
+                && null (inimigosJogo resultado) ~=? True,
+
+        "separaInimigosPorEstado - celula da base e terminal" ~:
+          let inimigoNaCelula = inimigo1 {posicaoInimigo = (4.9, 29.5)}
+              (_, vivos, naBase) = separaInimigosPorEstado [inimigoNaCelula] (4.5, 29.5)
+           in null vivos && length naBase == 1 ~=? True,
         
         "atualizaJogo - inimigos mortos são removidos" ~:
           length (inimigosJogo (atualizaJogo 1.0 jogoComInimigoMorto)) < length (inimigosJogo jogoComInimigoMorto) ~=? True,
@@ -30,15 +40,21 @@ testesTarefa3 =
         -- Testes de torres
         "atualizaTodasTorres - torres disparam" ~:
           let (torres', _) = atualizaTodasTorres 5.0 [inimigoProximo] [torrePronta]
-           in tempoTorre (head torres') == cicloTorre (head torres') ~=? True,
+           in case torres' of
+                torreAtualizada : _ -> tempoTorre torreAtualizada == cicloTorre torreAtualizada
+                [] -> False
+           ~=? True,
         
         "atualizaTorre - decrementa tempo" ~:
           let (torre', _) = atualizaTorre 1.0 [] torre1
            in tempoTorre torre' < tempoTorre torre1 ~=? True,
         
         "dispararTorre - atinge inimigos no alcance" ~:
-          let (torre', inimigos') = dispararTorre torrePronta [inimigoProximo]
-           in vidaInimigo (head inimigos') < vidaInimigo inimigoProximo ~=? True,
+          let (_, inimigos') = dispararTorre torrePronta [inimigoProximo]
+           in case inimigos' of
+                inimigoAtingido : _ -> vidaInimigo inimigoAtingido < vidaInimigo inimigoProximo
+                [] -> False
+           ~=? True,
         
         "distanciaDaTorre - calcula corretamente" ~:
           distanciaDaTorre torre1 inimigo1 >= 0 ~=? True,
@@ -54,9 +70,11 @@ testesTarefa3 =
         
         "atualizaProjetis - decrementa duração" ~:
           let inimigo' = atualizaProjetis 1.0 inimigoComProjetil
-           in case duracaoProjetil (head (projeteisInimigo inimigo')) of
-                Finita t -> t < 5.0
-                _ -> False
+           in case projeteisInimigo inimigo' of
+                projetil : _ -> case duracaoProjetil projetil of
+                  Finita t -> t < 5.0
+                  Infinita -> False
+                [] -> False
            ~=? True,
         
         "atualizaDuracaoProjetil - funciona corretamente" ~:
@@ -124,7 +142,7 @@ testesTarefa3 =
         
         -- Testes auxiliares
         "separaInimigosPorEstado - separa corretamente" ~:
-          let (mortos, vivos, naBase) = separaInimigosPorEstado [inimigoMorto, inimigoVivo] (10.0, 10.0)
+          let (mortos, vivos, _) = separaInimigosPorEstado [inimigoMorto, inimigoVivo] (10.0, 10.0)
            in length mortos == 1 && length vivos == 1 ~=? True,
         
         "inimigoMorreu - True quando vida <= 0" ~:
@@ -164,9 +182,6 @@ testesTarefa3 =
 -- ============================================================================
 -- ondas
 -- Exemplo de inimigos
--- Tipo Tempo
-type Tempo = Float -- em segundos
-
 mapaCorredorReverso :: Mapa
 mapaCorredorReverso =
   [ [Relva, Relva, Relva],
@@ -189,6 +204,20 @@ onda1 = Onda
 jogoComInimigoNaBase :: Jogo
 jogoComInimigoNaBase = jogo1 {
   inimigosJogo = [inimigo1 {posicaoInimigo = posicaoBase base1}]
+}
+
+jogoInimigoAtravessaBase :: Jogo
+jogoInimigoAtravessaBase = jogo1 {
+  mapaJogo = replicate 5 (replicate 5 Terra),
+  baseJogo = base1 {posicaoBase = (2, 1), vidaBase = 50},
+  portaisJogo = [],
+  torresJogo = [],
+  inimigosJogo = [inimigo1 {
+    posicaoInimigo = (1, 1),
+    direcaoInimigo = Este,
+    velocidadeBaseInimigo = 2,
+    velocidadeInimigo = 2
+  }]
 }
 
 -- Jogo com inimigo morto
@@ -272,38 +301,3 @@ inimigoVivo = inimigo1 {vidaInimigo = 100}
 -- ============================================================================
 -- INSTÂNCIAS Eq
 -- ============================================================================
-
-instance Eq Jogo where
-  (Jogo {baseJogo = base1, portaisJogo = p1, torresJogo = t1, mapaJogo = m1, inimigosJogo = i1, lojaJogo = l1})
-    == (Jogo {baseJogo = base2, portaisJogo = p2, torresJogo = t2, mapaJogo = m2, inimigosJogo = i2, lojaJogo = l2}) =
-    base1 == base2 && p1 == p2 && t1 == t2 && m1 == m2 && i1 == i2 && l1 == l2
-
-instance Eq Base where
-  (Base {posicaoBase = p1, vidaBase = v1, creditosBase = c1})
-    == (Base {posicaoBase = p2, vidaBase = v2, creditosBase = c2}) =
-    p1 == p2 && v1 == v2 && c1 == c2
-
-instance Eq Torre where
-  (Torre {posicaoTorre = p1, alcanceTorre = a1, rajadaTorre = r1, cicloTorre = c1, danoTorre = d1, tempoTorre = t1, projetilTorre = proj1})
-    == (Torre {posicaoTorre = p2, alcanceTorre = a2, rajadaTorre = r2, cicloTorre = c2, danoTorre = d2, tempoTorre = t2, projetilTorre = proj2}) =
-    p1 == p2 && a1 == a2 && r1 == r2 && c1 == c2 && d1 == d2 && t1 == t2 && proj1 == proj2
-
-instance Eq Onda where
-  (Onda {inimigosOnda = i1, cicloOnda = c1, tempoOnda = t1, entradaOnda = e1}) 
-    == (Onda {inimigosOnda = i2, cicloOnda = c2, tempoOnda = t2, entradaOnda = e2}) =
-    i1 == i2 && c1 == c2 && t1 == t2 && e1 == e2
-
-instance Eq Portal where
-  (Portal {posicaoPortal = p1, ondasPortal = o1}) 
-    == (Portal {posicaoPortal = p2, ondasPortal = o2}) =
-    p1 == p2 && o1 == o2
-
-instance Eq Inimigo where
-  (Inimigo {posicaoInimigo = p1, direcaoInimigo = d1, vidaInimigo = v1, velocidadeBaseInimigo = vb1, velocidadeInimigo = vel1, ataqueInimigo = a1, butimInimigo = b1, projeteisInimigo = proj1}) 
-    == (Inimigo {posicaoInimigo = p2, direcaoInimigo = d2, vidaInimigo = v2, velocidadeBaseInimigo = vb2, velocidadeInimigo = vel2, ataqueInimigo = a2, butimInimigo = b2, projeteisInimigo = proj2}) =
-    p1 == p2 && d1 == d2 && v1 == v2 && vb1 == vb2 && vel1 == vel2 && a1 == a2 && b1 == b2 && proj1 == proj2
-
-instance Eq Projetil where
-  (Projetil {tipoProjetil = t1, duracaoProjetil = d1}) 
-    == (Projetil {tipoProjetil = t2, duracaoProjetil = d2}) =
-    t1 == t2 && d1 == d2

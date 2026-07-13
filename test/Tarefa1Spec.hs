@@ -62,13 +62,20 @@ testesTarefa1 =
       ]
 
 -- Jogos e entidades auxiliares
+jogoInvalidoPortal, jogoInimigoVidaNegativa, jogoTorreAlcanceNegativo, jogoBaseSobreTorre :: Jogo
 jogoInvalidoPortal = jogo1 { portaisJogo = [portalAgua] }
+
+portalAgua, portalComInimigos, portalMultiplasOndas :: Portal
 portalAgua = Portal { posicaoPortal = (3, 0), ondasPortal = [] }
 portalComInimigos = Portal { posicaoPortal = (0, 0), ondasPortal = [Onda [inimigo1] 1 1 1] }
 portalMultiplasOndas = Portal { posicaoPortal = (0, 0), ondasPortal = [Onda [] 1 1 1, Onda [] 1 1 1] }
+
+mapaBloqueado :: Mapa
 mapaBloqueado = replicate 6 [Agua, Agua, Agua, Agua, Agua, Agua]
 jogoInimigoVidaNegativa = jogo1 { inimigosJogo = [inimigo1 { vidaInimigo = -10 }] }
 jogoTorreAlcanceNegativo = jogo1 { torresJogo = [torre1 { alcanceTorre = -5 }] }
+
+torreAlcanceNegativo, torreRajadaNegativa, torreCicloNegativo, torreTerra :: Torre
 torreAlcanceNegativo = torre1 { alcanceTorre = -5 }
 torreRajadaNegativa = torre1 { rajadaTorre = -1 }
 torreCicloNegativo = torre1 { cicloTorre = -1 }

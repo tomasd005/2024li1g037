@@ -12,6 +12,8 @@ testesUILayout =
   TestLabel "UI layout" $
     test
       [ "top controls stay inside top bar" ~: assertBool "Top controls must fit inside the HUD bar" allTopControlsInside,
+        "game panel stays inside screen" ~: assertBool "Game panel must fit inside the screen" gamePanelInsideScreen,
+        "panel actions stay inside game panel" ~: assertBool "Panel actions must fit inside the panel" panelActionsInside,
         "shop panel stays above bottom edge" ~: assertBool "Shop panel must stay visible inside the screen" shopPanelInsideScreen,
         "shop slots stay inside shop panel" ~: assertBool "Shop slots must fit inside the panel" shopSlotsInsidePanel,
         "responsive layouts keep enough usable map area" ~: assertBool "Representative resolutions must preserve useful map space" layoutResponsiveEnough
@@ -19,6 +21,12 @@ testesUILayout =
 
 allTopControlsInside :: Bool
 allTopControlsInside = all (`rectInside` topBarRect) topControls
+
+gamePanelInsideScreen :: Bool
+gamePanelInsideScreen = gamePanelRect `rectInside` screenRect
+
+panelActionsInside :: Bool
+panelActionsInside = all (`rectInside` gamePanelRect) panelActions
 
 shopPanelInsideScreen :: Bool
 shopPanelInsideScreen =
@@ -58,6 +66,9 @@ alturaUtil = layoutAlturaMax
 topBarRect :: UIRect
 topBarRect = UIRect 0 (alturaJanela / 2 - 42) (larguraJanela - 48) 82
 
+screenRect :: UIRect
+screenRect = UIRect 0 0 larguraJanela alturaJanela
+
 topControls :: [UIRect]
 topControls =
   [ pauseRect,
@@ -67,6 +78,15 @@ topControls =
     autoBotRect,
     hudToggleRect,
     shopToggleRect
+  ]
+
+panelActions :: [UIRect]
+panelActions =
+  [ upgradeRect,
+    specializationARect,
+    specializationBRect,
+    sellRect,
+    cancelRect
   ]
 
 rectInside :: UIRect -> UIRect -> Bool

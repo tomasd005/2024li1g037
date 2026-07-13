@@ -2,46 +2,48 @@
 
 Tags: #sistema #ui
 
-Relacionadas:
+Relacionadas: [[HOME]], [[estado-atual]], [[backlog-jogo]]
 
-- [[HOME]]
-- [[estado-atual]]
-- [[backlog-jogo]]
+## Modulos
 
-## Responsabilidades
+- `app/Desenhar.hs`: composicao visual
+- `app/UIComponents.hs`: paineis, botoes e `UIRect`
+- `app/UIRects.hs`: geometria interativa partilhada
+- `app/UIState.hs`: dados derivados para HUD e vagas
+- `app/UIText.hs`: tipografia bitmap/Gloss
+- `app/Eventos.hs`: input e bloqueio da UI
+- `lib/MapGeometry.hs`: conversao mapa/ecra
 
-- HUD superior
-- painel lateral direito
-- sidebar da loja
-- mensagens temporarias
-- overlays de pausa, vitoria e derrota
-- menus principais e secundarios
+## Layout atual
 
-## Modulos principais
+- espaco virtual base de 1920x1080, escalado uniformemente para a janela
+- HUD e controlos no topo
+- loja recolhivel na esquerda
+- painel contextual recolhivel na direita
+- mapa ocupa o centro sem receber cliques atraves dos paineis
 
-- `app/Desenhar.hs`
-- `app/UIComponents.hs`
-- `app/UIRects.hs`
-- `app/UIState.hs`
-- `app/UIText.hs`
-- `app/Eventos.hs`
+## Fonte de verdade
 
-## Decisoes atuais
+`UIRects.hs` define as areas desenhadas e interativas. O painel lateral usa `gamePanelRect` tanto no render como em `cliqueBloqueadoPelaUI`; os botoes de upgrade, especializacao, venda e limpar sao testados para permanecer dentro desse painel.
 
-- a UI usa um espaco virtual base de `1920x1080`
-- o desenho final e escalado com `uiScale`
-- a sidebar da loja fica fixa do lado esquerdo
-- o painel de detalhes da torre fica fixo do lado direito
-- a UI bloqueia input no mapa por baixo atraves de hitboxes explicitas
+O painel esta dividido em faixas fixas:
 
-## Pontos sensiveis
+1. mapa, capitulo e preview da proxima vaga;
+2. estado da base/partida;
+3. torre selecionada e comparacao do upgrade;
+4. acoes.
 
-- qualquer alteracao de layout deve atualizar tambem o input em `Eventos.hs`
-- `UIRect` e a base da coerencia entre desenho e clique
-- a loja e o painel lateral nao devem tapar leitura critica do mapa
+## Estados e acessibilidade
 
-## Proximos melhoramentos
+- hover, selecionado, desativado e dinheiro insuficiente
+- contraste por texto e contorno, nao apenas cor
+- pausa, 1x/2x/4x, HUD e loja recolhiveis
+- vitoria e derrota com fluxo proprio
+- submenus com fundo animado comum e botoes `Voltar` ligados a hitboxes partilhadas
 
-- validar ergonomia da sidebar em mais playtests
-- criar scroll/categorias se a loja crescer
-- unificar ainda mais as hitboxes de render/input
+## Aberto
+
+- validar visualmente todas as resolucoes alvo
+- adicionar icones no preview e barra de progresso da vaga
+- categorias/scroll quando o roster ultrapassar o espaco da sidebar
+- reducao de efeitos e opcoes de video reais

@@ -10,7 +10,6 @@ Relacionadas:
 - [[estado-atual]]
 - [[backlog-jogo]]
 - [[extras-implementados]]
-- [[etapa5-roadmap-features]]
 
 ## Problemas e sugestoes identificados
 

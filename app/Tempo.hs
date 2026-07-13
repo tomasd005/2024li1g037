@@ -1,7 +1,8 @@
 module Tempo where
 
 import BotSystem
-import Data.List (sortOn)
+import Data.List (sortOn, unsnoc)
+import EnemySystem (atualizaPassivos, contextoCombateInimigos, resolveTowerHitComContexto)
 import ImmutableTowers
 import LI12425
 import MapData
@@ -10,6 +11,7 @@ import ProgressionSystem
 import SaveSystem
 import ScoreSystem
 import Tarefa3
+import TowerSystem (reconcileTowerRegistry, selecionaAlvos)
 import WaveSystem
 
 reageTempo :: Tempo -> ImmutableTowers -> IO ImmutableTowers
@@ -20,7 +22,10 @@ reageTempo segundos estado@ImmutableTowers {modo = EmJogo} =
       velocidadeAtual = velocidadeJogo estado
       tempoAtual = tempo estado
       segundosFloat = realToFrac segundos * velocidadeAtual
-      jogoAtualizado = atualizaJogo segundosFloat jogoAtual
+      registry = registoTorres estado
+      seletor = selecionaAlvos registry (posicaoBase (baseJogo jogoAtual))
+      contextoInimigos = contextoCombateInimigos (inimigosJogo jogoAtual)
+      jogoAtualizado = atualizaJogoComRegras seletor (resolveTowerHitComContexto registry contextoInimigos) atualizaPassivos segundosFloat jogoAtual
       tempoNovo = tempoAtual + segundos
       mensagensAtualizadas = atualizaMensagens segundos (mensagensUI estado)
       efeitosAtualizados = atualizaEfeitosUpgrade segundos (efeitosUpgrade estado)
@@ -68,7 +73,7 @@ atualizaInputContinuo segundos estado
             then estado {backspacePerfilTimer = timerNovo}
             else
               let perfil = perfilJogador estado
-                  novoNome = if null (nomeJogador perfil) then "" else init (nomeJogador perfil)
+                  novoNome = maybe "" fst (unsnoc (nomeJogador perfil))
                in estado
                     { perfilJogador = perfil {nomeJogador = novoNome},
                       backspacePerfilTimer = 0.055
@@ -85,7 +90,8 @@ atualizaBotAutomatico segundos estado
             else
               case botExecutaAcao (jogo estado) of
                 Just (jogoNovo, texto) ->
-                  adicionaMensagemTempo MsgInfo texto estado {jogo = jogoNovo, botCooldown = 0.85}
+                  let registry = reconcileTowerRegistry (registoTorres estado) (torresJogo jogoNovo)
+                   in adicionaMensagemTempo MsgInfo texto estado {jogo = jogoNovo, registoTorres = registry, botCooldown = 0.85}
                 Nothing ->
                   estado {botCooldown = 0.35}
 
@@ -123,11 +129,15 @@ adicionaOndaInfinita :: ImmutableTowers -> ImmutableTowers
 adicionaOndaInfinita estado =
   let proxima = ondasSobrevividas estado + 1
       jogoAtual = jogo estado
-      novaOnda = criaOnda (proxima + 1) (5 + proxima) 2
+      mutadores = mutadoresOndaInfinita proxima
+      novaOnda = aplicaMutadoresInfinito proxima (criaOnda (proxima + 1) (5 + proxima) 2)
       portaisAtualizados = case portaisJogo jogoAtual of
         [] -> [(portalPorMapa (mapaAtual estado)) {ondasPortal = [novaOnda]}]
         (portal:resto) -> portal {ondasPortal = [novaOnda]} : resto
-   in estado {jogo = jogoAtual {portaisJogo = portaisAtualizados}, ondasSobrevividas = proxima, totalOndasPartida = proxima + 1}
+      estadoNovo = estado {jogo = jogoAtual {portaisJogo = portaisAtualizados}, ondasSobrevividas = proxima, totalOndasPartida = proxima + 1}
+   in if null mutadores
+        then estadoNovo
+        else adicionaMensagemTempo MsgAviso ("Mutador: " ++ nomeMutadores mutadores) estadoNovo
 
 registaResultado :: ImmutableTowers -> IO ImmutableTowers
 registaResultado estado = do

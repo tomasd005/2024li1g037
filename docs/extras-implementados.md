@@ -30,11 +30,10 @@ Para o estado jogavel atual e correcoes recentes, ver [[estado-atual]].
 
 ## Inimigos com comportamento variado
 
-As ondas agora geram inimigos por nivel:
-
-- inimigos rapidos aparecem periodicamente
-- inimigos brutos tem mais vida, dano e recompensa
-- as ondas escalam vida, velocidade, dano e butim
+- basico, rapido, tanque, blindado, regenerador, dispersor, protegido e elite
+- tres bosses com fases/auras diferentes
+- armadura, resistencia direta/area, escudo e regeneracao
+- ondas escalam vida, velocidade, dano e butim
 
 ## Melhorias de torres
 
@@ -53,11 +52,14 @@ Melhorias recentes:
 - preview de upgrade no painel lateral antes da compra
 - feedback visual no momento do upgrade
 - modelos das torres com mais detalhes visuais conforme o poder/upgrade
+- prioridades de alvo reais por identidade
+- especializacao permanente entre dano/alcance e rajada/cadencia
+- niveis maximos configurados por torre
 
 ## Modos de jogo
 
 - Historia: ondas equilibradas.
-- Infinito: sobrevivencia com ondas geradas continuamente.
+- Infinito: sobrevivencia continua com mutadores Fortificados, Butim Reduzido e Onda Dupla.
 - Desafio: menos vida e ondas mais fortes.
 - Boss: poucas ondas, mas inimigos duros.
 - Sandbox: muitos creditos para testar torres e upgrades.
@@ -78,6 +80,7 @@ Melhorias recentes:
 
 - `E` no menu abre o editor.
 - Clicar numa celula alterna entre relva, terra, asfalto e agua.
+- Edicoes que bloqueiem o caminho ou invalidem base, portal ou torres sao rejeitadas.
 - `ENTER` ou `ESC` volta ao menu.
 
 ## Obstaculos dinamicos

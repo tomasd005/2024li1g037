@@ -2,110 +2,81 @@
 
 Tags: #estado #hub
 
-Resumo vivo do estado jogavel atual do Immutable Towers.
+Resumo vivo do estado jogavel. Detalhes tecnicos ficam nas notas de sistema e trabalho aberto fica apenas em [[backlog-jogo]].
 
-Relacionadas:
-
-- [[HOME]]
-- [[extras-implementados]]
-- [[backlog-jogo]]
+Relacionadas: [[HOME]], [[extras-implementados]], [[roadmap-atual]]
 
 ## Ultima atualizacao
 
-- Data: 2026-07-09
+- Data: 2026-07-13
+- Build: OK
+- Testes: 157/157
 
 ## Estado geral
 
-O jogo encontra-se jogavel com menu principal, perfis locais, ranking local, varios modos, loja in-game, upgrades, efeitos de projetil, save/load e editor de mapa.
+O jogo esta jogavel com menu, perfil e ranking locais, cinco modos, cinco mapas rotativos, campanha, loja, upgrades, classes de inimigos, efeitos, save/load, editor de mapa e bot automatico opcional.
 
-## Sistemas ativos
+## Torres
 
-### Gameplay
+- nove identidades configuradas numa unica fonte `TowerSpec`
+- `TowerId`, nivel e especializacao guardados explicitamente por torre construida
+- prioridades reais: primeiro na rota, mais rapido, mais vida e maior grupo
+- nivel maximo diferente por torre
+- escolha permanente entre especializacao de dano/alcance e rajada/cadencia
+- painel com DPS aproximado, stats, prioridade, custo, preview e refund
+- modelos, cores e evolucao visual ligados a identidade runtime
 
-- ondas de inimigos
-- torres com varios tipos de projetil
-- efeitos: fogo, gelo, resina, medo, veneno, eletrico
-- sinergias entre projeteis
-- upgrades de torres
-- venda de torres
-- modos historia, infinito, desafio, boss e sandbox
+Ver [[sistema-torres]].
 
-### Progressao e meta
+## Inimigos e combate
 
-- perfil local
-- leaderboard local
-- gemas
-- desbloqueio de torres
-- baus
-- fusao para torre Tempestade
-- progresso por capitulo/estagio
+- classes: basico, rapido, tanque, blindado, regenerador, dispersor, protegido e elite
+- bosses: Ariete Veloz, Bastiao Vivo e Nexo da Ruptura
+- armadura, resistencia direta/area, escudo, regeneracao e fases simples
+- Guardiao protege aliados proximos; Ruptura enfraquece torres dentro da aura
+- velocidade base separada da velocidade efetiva, evitando inimigos presos apos gelo/resina
+- chegada a base detetada mesmo quando um inimigo atravessa a posicao da base entre frames
+- spatial grid mantem a procura de alvos escalavel
+- impactos, estados, barras de vida e numeros de dano visiveis
 
-### Ferramentas
+Ver [[sistema-inimigos]].
 
-- save/load local
-- editor de mapa
-- sugestao/bot simples
-- bundle Windows
+## Ondas, modos e mapas
 
-## Implementacao mais recente
+- composicoes declarativas por grupos de classes
+- historia com dez vagas por estagio e cinco estagios por capitulo
+- infinito gera vagas continuamente e aplica Fortificados, Butim Reduzido e Onda Dupla em marcos fixos
+- desafio, boss e sandbox usam composicoes e economias proprias
+- preview textual da proxima vaga no painel lateral
+- editor rejeita alteracoes que removam o caminho portal-base, movam o piso da base/portal ou invalidem torres
+- cinco mapas rotativos com terreno normal, asfalto e agua
 
-### Input e UI
+Ver [[sistema-ondas]].
 
-- a UI agora bloqueia corretamente o clique no mapa por baixo
-- trocar de torre na loja ja nao deve construir acidentalmente no terreno
-- as zonas de HUD, loja e painel lateral passaram a consumir input
-- a loja in-game passou para uma sidebar lateral esquerda em vez de ocupar o rodape
-- a barra inferior ficou mais leve para devolver leitura ao mapa
-- a barra superior deixou de ter o botao manual `GO`
-- as vagas passam agora a arrancar automaticamente quando existe uma nova onda pronta
-- o layout foi validado em testes com resolucoes representativas: 1280x720, 1600x900, 1920x1080 e 2560x1440
-- a partida passou a ter ecras de resultado dedicados para vitoria e derrota
-- a derrota mostra estatisticas antes de voltar ao menu
-- a vitoria permite repetir o nivel ou voltar ao menu
+## UI e input
 
-### Upgrades
+- espaco virtual 1920x1080 com escala para varias resolucoes
+- HUD superior, loja lateral esquerda e painel contextual direito
+- painel direito usa a mesma `gamePanelRect` para desenho e bloqueio de input
+- cliques sobre UI nao constroem torres no mapa
+- troca de torre selecionada nao dispara construcao acidental
+- pausa, velocidades 1x/2x/4x, HUD recolhivel e loja recolhivel
+- ecras dedicados de vitoria e derrota
+- submenus com fundo animado consistente e botoes `Voltar` clicaveis
 
-- o painel da torre mostra preview do upgrade antes da compra
-- o upgrade agora mostra melhor o ganho esperado em stats
-- foi adicionado feedback visual no momento da melhoria
-- os modelos das torres agora ganham detalhes visuais conforme o poder/upgrade
-- o painel lateral da torre passou a mostrar mais contexto: raridade, efeito, venda e comparacao de upgrade mais completa
+Ver [[sistema-ui]].
 
-### Inimigos
+## Progressao e persistencia
 
-- corrigida a logica de velocidade para separar velocidade base de efeitos temporarios
-- isto resolve o bug em que alguns inimigos ficavam presos apos certos disparos
-- os disparos agora deixam um impacto visual mais claro no alvo
-- o feedback de dano ficou mais explicito com numeros flutuantes simples no inimigo atingido
-- o mapa `Cruzamento Solar` foi corrigido para remover agua em cima do caminho
-- a escolha de direcao dos inimigos foi ajustada para permitir inversao quando essa e a unica saida valida do trilho
+- perfil, ranking, gemas, baus, desbloqueios e fusao da Tempestade
+- modos com nivel minimo
+- save de partida versionado conserva identidade, nivel e especializacao
+- saves antigos contendo apenas `Jogo` continuam a abrir por migracao de fallback
 
-### Automacao e controlo
-
-- o bot automatico agora pode ser ativado no jogo
-- quando ativo, o bot consegue iniciar vagas, construir torres e melhorar torres por cooldown
-- o HUD mostra o estado atual do bot
-
-## Estado dos testes
+## Qualidade confirmada
 
 - `cabal build`: OK
-- `cabal test`: OK
-- suite: 130/130
-
-## Notas de manutencao
-
-Esta nota deve manter:
-
-- o que esta funcional agora
-- o que foi corrigido recentemente
-- o estado atual de build/testes
-
-## Documentacao tecnica
-
-Ja existem notas por sistema no vault:
-
-- [[sistema-ui]]
-- [[sistema-torres]]
-- [[sistema-inimigos]]
-- [[sistema-ondas]]
-- [[sistema-progressao]]
+- `cabal test`: 157 casos, 0 erros, 0 falhas
+- testes cobrem identidade, targeting, especializacoes, saves, resistencias, bosses, mutadores, editor e hitboxes
+- instancias de igualdade e testes academicos foram limpos sem warnings orfaos ou funcoes parciais
+- validacao visual manual desta ultima ronda ainda esta pendente

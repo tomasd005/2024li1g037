@@ -4,7 +4,10 @@ module UIRects
     speed2Rect,
     speed4Rect,
     autoBotRect,
+    gamePanelRect,
     upgradeRect,
+    specializationARect,
+    specializationBRect,
     sellRect,
     cancelRect,
     hudToggleRect,
@@ -29,6 +32,9 @@ module UIRects
     modeDesafioRect,
     modeBossRect,
     modeSandboxRect,
+    submenuBackRect,
+    optionsBackRect,
+    shopBackRect,
   )
 where
 
@@ -41,9 +47,16 @@ speed1Rect = UIRect 476 494 52 42
 speed2Rect = UIRect 534 494 52 42
 speed4Rect = UIRect 592 494 56 42
 autoBotRect = UIRect 660 494 74 42
-upgradeRect = UIRect 772 (-66) 122 42
-sellRect = UIRect 772 (-116) 122 42
-cancelRect = UIRect 772 (-166) 122 42
+upgradeRect = UIRect 774 (-226) 250 42
+sellRect = UIRect 708 (-278) 120 42
+cancelRect = UIRect 840 (-278) 120 42
+
+specializationARect, specializationBRect :: UIRect
+specializationARect = UIRect 708 (-226) 120 42
+specializationBRect = UIRect 840 (-226) 120 42
+
+gamePanelRect :: UIRect
+gamePanelRect = UIRect 774 8 300 760
 
 hudToggleRect, shopToggleRect :: UIRect
 hudToggleRect = UIRect 732 494 64 42
@@ -95,3 +108,8 @@ modeInfinitoRect = UIRect 0 90 300 152
 modeDesafioRect = UIRect 360 90 300 152
 modeBossRect = UIRect (-180) (-105) 300 152
 modeSandboxRect = UIRect 180 (-105) 300 152
+
+submenuBackRect, optionsBackRect, shopBackRect :: UIRect
+submenuBackRect = UIRect 0 (-236) 150 48
+optionsBackRect = UIRect 0 (-260) 150 48
+shopBackRect = UIRect 0 (-250) 150 72

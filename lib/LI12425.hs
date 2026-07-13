@@ -74,7 +74,7 @@ data Base = Base
     -- | Balanço de créditos do jogador.
     creditosBase :: Creditos
   }
-  deriving (Show, Read)
+  deriving (Eq, Show, Read)
 
 -- | Distância entre duas posições.
 type Distancia = Float
@@ -107,7 +107,7 @@ data Torre = Torre
     -- | Efeito secundário associado ao tipo de projétil da torre.
     projetilTorre :: Projetil
   }
-  deriving (Show, Read)
+  deriving (Eq, Show, Read)
 
 -- | Loja de torres disponíveis para construir por uma quantidade de créditos.
 type Loja = [(Creditos, Torre)]
@@ -123,7 +123,7 @@ data Projetil = Projetil
     -- | Duração do efeito do projétil no inimigo.
     duracaoProjetil :: Duracao
   }
-  deriving (Show, Read)
+  deriving (Eq, Show, Read)
 
 -- | Direção de movimento de uma entidade no jogo.
 data Direcao
@@ -152,7 +152,7 @@ data Inimigo = Inimigo
     -- | Efeitos secundários ativos no inimigo.
     projeteisInimigo :: [Projetil]
   }
-  deriving (Show, Read)
+  deriving (Eq, Show, Read)
 
 -- | Onda de inimigos que saem de um portal.
 data Onda = Onda
@@ -165,7 +165,7 @@ data Onda = Onda
     -- | Tempo restante, em segundos, para a entrada da onda.
     entradaOnda :: Tempo
   }
-  deriving (Show, Read)
+  deriving (Eq, Show, Read)
 
 -- | Portal de entrada de inimigos no mapa.
 data Portal = Portal
@@ -174,7 +174,7 @@ data Portal = Portal
     -- | Ondas de inimigos que saem do portal.
     ondasPortal :: [Onda]
   }
-  deriving (Show, Read)
+  deriving (Eq, Show, Read)
 
 -- | Estado do jogo. Um jogo é composto pela base, vários portais, várias torres, um mapa, vários inimigos e a loja.
 data Jogo = Jogo
@@ -191,7 +191,7 @@ data Jogo = Jogo
     -- | Loja de torres disponíveis para construir.
     lojaJogo :: Loja
   }
-  deriving (Show, Read)
+  deriving (Eq, Show, Read)
 
 -- | Valor inicial que determina a sequência de números pseudo-aleatórios.
 type Semente = Int

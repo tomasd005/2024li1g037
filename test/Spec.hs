@@ -6,6 +6,10 @@ import Tarefa1Spec
 import Tarefa2Spec
 import Tarefa3Spec
 import UILayoutSpec
+import TowerSystemSpec
+import EnemySystemSpec
+import MapEditorSpec
+import WaveSystemSpec
 
 testSuite :: Test
 testSuite =
@@ -16,4 +20,4 @@ testSuite =
       ]
 
 main :: IO ()
-main = runTestTTAndExit $ test [testSuite, testesTarefa1, testesTarefa2, testesTarefa3, testesUILayout]
+main = runTestTTAndExit $ test [testSuite, testesTarefa1, testesTarefa2, testesTarefa3, testesUILayout, testesTowerSystem, testesEnemySystem, testesWaveSystem, testesMapEditor]

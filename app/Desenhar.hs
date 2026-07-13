@@ -1,7 +1,9 @@
 module Desenhar where
 
-import Data.Maybe (fromMaybe)
 import Data.Fixed (mod')
+import Data.List (intercalate)
+import Data.Maybe (fromMaybe)
+import EnemySystem
 import GameFactory
 import Graphics.Gloss
 import Graphics.Gloss.Juicy
@@ -15,6 +17,7 @@ import RenderConfig
 import SaveSystem
 import Tarefa2 (inimigosNoAlcance)
 import TowerSystem
+import TowerRuntime
 import UIComponents
 import UIRects
 import UIState
@@ -54,8 +57,8 @@ desenha e = case modo e of
   EmJogo -> return $ desenhaJogoCompleto e
   TelaVitoria -> return $ desenhaResultadoPartida e
   TelaDerrota -> return $ desenhaResultadoPartida e
-  TutorialFoto -> return desenhaTutorial
-  MostrarCreditos -> return desenhaCreditos
+  TutorialFoto -> return $ desenhaTutorial e
+  MostrarCreditos -> return $ desenhaCreditos e
   MostrarPerfil -> return $ desenhaPerfil e
   MostrarLeaderboard -> return $ desenhaLeaderboard e
   MostrarOpcoes -> return $ desenhaOpcoes e
@@ -126,7 +129,7 @@ desenhaMenu e opcaoSel =
         drawSidebarButton (posicaoRato e) menuProfileRect (opcaoSel == Perfil) "Perfil" "Progressão local",
         drawSidebarButton (posicaoRato e) menuLeaderboardRect (opcaoSel == Leaderboard) "Ranking" "Melhores scores",
         drawSidebarButton (posicaoRato e) menuHelpRect (opcaoSel == Creditos) "Ajuda" "Como jogar",
-        drawSidebarButton (posicaoRato e) menuOptionsRect (opcaoSel == Opcoes) "Opções" "Controlos e sistema",
+        drawSidebarButton (posicaoRato e) menuOptionsRect (opcaoSel == Opcoes) "Opcoes" "Controlos e sistema",
         drawSidebarButton (posicaoRato e) menuExitRect (opcaoSel == Sair) "Sair" "Fechar o jogo",
         painelResumoMenu e,
         drawGlossBody (-634) (-446) 0.072 (makeColorI 180 188 174 255) ("Perfil: " ++ nomeJogador (perfilJogador e)),
@@ -145,8 +148,8 @@ desenhaMenu e opcaoSel =
 painelResumoMenu :: ImmutableTowers -> Picture
 painelResumoMenu _ = Blank
 
-desenhaTutorial :: Picture
-desenhaTutorial = desenhaPainelTexto "TUTORIAL" [
+desenhaTutorial :: ImmutableTowers -> Picture
+desenhaTutorial e = desenhaPainelTextoAnimado e "TUTORIAL" [
     "1. Compra uma torre na loja no canto inferior esquerdo.",
     "2. Move o rato sobre a relva para ver a celula, alcance e validade.",
     "3. Clique esquerdo coloca a torre; botao direito cancela a selecao.",
@@ -154,8 +157,8 @@ desenhaTutorial = desenhaPainelTexto "TUTORIAL" [
     "5. P pausa, U melhora torre, S/L guarda/carrega, B chama bot, O cria obstaculo."
   ]
 
-desenhaCreditos :: Picture
-desenhaCreditos = desenhaPainelTexto "CREDITOS" [
+desenhaCreditos :: ImmutableTowers -> Picture
+desenhaCreditos e = desenhaPainelTextoAnimado e "CREDITOS" [
     "Immutable Towers",
     "Projeto LI1 — Tower Defense em Haskell + Gloss.",
     "UI, feedback de colocacao e compatibilidade Windows/GHCup atualizados.",
@@ -166,7 +169,7 @@ desenhaPerfil :: ImmutableTowers -> Picture
 desenhaPerfil e =
   let perfil = perfilJogador e
       meta = progressoMeta e
-   in desenhaPainelTexto "PERFIL" [
+   in desenhaPainelTextoAnimado e "PERFIL" [
         "Nome: " ++ nomeJogador perfil,
         "Nivel: " ++ show (nivelJogadorMeta meta),
         "Gemas: " ++ show (gemasJogador meta),
@@ -184,7 +187,7 @@ desenhaLeaderboard e =
       linhas = if null scores
         then ["Ainda nao ha pontuacoes.", "Completa partidas para preencher o ranking."]
         else zipWith linhaScore [1 :: Int ..] scores
-   in desenhaPainelTexto "LEADERBOARD" linhas
+   in desenhaPainelTextoAnimado e "LEADERBOARD" linhas
   where
     linhaScore n score = show n ++ ". " ++ nomePontuacao score
       ++ " | " ++ nomeModoJogo (modoPontuacao score)
@@ -204,7 +207,7 @@ desenhaSelecionarModo e =
         modoCard e ModoDesafio 360 90 "DESAFIO" "ONDAS FORTES MAIS CEDO" ("REQUER NIVEL " ++ show (nivelMinimoModo ModoDesafio)),
         modoCard e ModoBoss (-180) (-105) "BOSS" "CHEFES E PICOS DE DANO" ("REQUER NIVEL " ++ show (nivelMinimoModo ModoBoss)),
         modoCard e ModoSandbox 180 (-105) "SANDBOX" "TESTAR BUILDS E UPGRADES" ("REQUER NIVEL " ++ show (nivelMinimoModo ModoSandbox)),
-        drawButton (posicaoRato e) (UIRect 0 (-312) 150 48) Neutral "ESC",
+        drawButton (posicaoRato e) (UIRect 0 (-312) 150 48) Neutral "Voltar",
         desenhaMensagens e
       ]
   ]
@@ -218,21 +221,20 @@ desenhaOpcoes e =
         desenhaFundoAnimado e,
         Scale (uiScale e) (uiScale e) $
           Pictures
-            [ drawPanel (UIRect 0 40 820 590),
-              drawTituloMenu (-336) 290 "Opções" "",
+            [ drawPanel (UIRect 0 20 820 650),
+              drawTituloMenu (-336) 292 "Opcoes" "",
               drawSubtituloMenu (-335) 220 "Interface adaptada a diferentes tamanhos de janela",
-              drawSectionText (-335) 170 "VIDEO",
-              drawBodyText (-335) 130 ("Resolucao atual: " ++ show rw ++ "x" ++ show rh),
-              drawBodyText (-335) 92 "Graficos: perfil Gloss 2D otimizado",
+              drawSectionText (-335) 160 "VIDEO",
+              drawBodyText (-335) 122 ("Resolucao atual: " ++ show rw ++ "x" ++ show rh),
+              drawBodyText (-335) 86 "Graficos: perfil Gloss 2D otimizado",
               drawSectionText (-335) 28 "CONTROLOS PRINCIPAIS",
               drawBodyText (-335) (-12) "Mouse: comprar, construir, selecionar, melhorar e vender torres",
               drawBodyText (-335) (-50) "P pausa | X alterna 1x/2x/4x | A bot automatico | B acao rapida",
-              drawBodyText (-335) 80 "P pausa | X alterna 1x/2x/4x | S/L guarda e carrega | B sugestão bot",
-              drawBodyText (-335) (-88) "H recolhe HUD | K esconde loja | E abre editor | ESC volta",
-              drawSectionText (-335) (-24) "DISTRIBUIÇÃO",
-              drawBodyText (-335) (-66) "Assets em app/imagens. Release = exe + pasta app/imagens.",
-              drawBodyText (-335) (-104) "Windows: cabal build e empacotar executável com as DLLs necessárias.",
-              drawButton rato (UIRect 0 (-245) 150 48) Neutral "ESC",
+              drawBodyText (-335) (-88) "S/L guarda e carrega | H recolhe HUD | K esconde loja",
+              drawSectionText (-335) (-132) "DISTRIBUICAO",
+              drawBodyText (-335) (-170) "Assets em app/imagens. Release = exe + pasta app/imagens.",
+              drawBodyText (-335) (-208) "Windows: cabal build e empacotar o executavel com as DLLs necessarias.",
+              drawButton rato optionsBackRect Neutral "Voltar",
               desenhaMensagens e
             ]
       ]
@@ -245,7 +247,8 @@ desenhaLojaMeta e =
           then "Sem torres desbloqueadas"
           else unwords (map nomeTowerId (take 8 (torresDesbloqueadas meta)))
    in Pictures
-        [ Color corFundoJogo $ rectangleSolid larguraJanela alturaJanela,
+        [ Color (makeColorI 18 28 24 255) $ rectangleSolid (viewW e) (viewH e),
+          desenhaFundoAnimado e,
           Color (withAlpha 0.96 corPainel) $ rectangleSolid 920 620,
           Color (makeColorI 68 78 63 255) $ rectangleWire 920 620,
           drawGlossTitle (-380) 266 0.28 (makeColorI 226 194 95 255) "LOJA",
@@ -256,7 +259,7 @@ desenhaLojaMeta e =
           drawGlossBody (-380) (-24) 0.078 (makeColorI 190 201 180 255) torresTexto,
           drawGlossTitle (-380) (-106) 0.14 corTextoSuave "FUSAO",
           drawGlossBody (-380) (-154) 0.082 (makeColorI 226 194 95 255) "F TECLA: TESLA + SOLAR + 180 GEMAS = TEMPESTADE",
-          drawButton (posicaoRato e) (UIRect 0 (-258) 150 48) Neutral "ESC",
+          drawButton (posicaoRato e) shopBackRect Neutral "Voltar",
           drawGlossBody (-276) (-210) 0.078 (makeColorI 154 164 146 255) "1/2/3 ABREM BAUS | F FUNDE",
           desenhaMensagens e
         ]
@@ -355,12 +358,13 @@ desenhaEditorMapa e =
     drawUITextLeft (-larguraJanela/2 + 44) (alturaJanela/2 - 74) 2 corTextoSuave "CLIQUE NUMA CELULA: RELVA -> TERRA -> ASFALTO -> AGUA. ESC VOLTA."
   ]
 
-desenhaPainelTexto :: String -> [String] -> Picture
-desenhaPainelTexto titulo linhas =
+desenhaPainelTextoAnimado :: ImmutableTowers -> String -> [String] -> Picture
+desenhaPainelTextoAnimado e titulo linhas =
   Pictures [
-    Color corFundoJogo $ rectangleSolid larguraJanela alturaJanela,
+    Color (makeColorI 18 28 24 255) $ rectangleSolid (viewW e) (viewH e),
+    desenhaFundoAnimado e,
     drawModalPanel 860 590 titulo linhas,
-    drawButton Nothing (UIRect 0 (-236) 150 48) Neutral "ESC"
+    drawButton (posicaoRato e) submenuBackRect Neutral "Voltar"
   ]
 
 -- ============================================================================
@@ -422,7 +426,7 @@ desenhaPreVisualizacaoColocacao e =
                 Color (withAlpha 0.16 cor) $ Translate centroX centroY $ rectangleSolid bloco bloco,
                 Color (withAlpha 0.95 cor) $ Translate centroX centroY $ rectangleWire bloco bloco,
                 Color (withAlpha 0.18 (makeColorI 111 150 168 255)) $ Translate centroX centroY $ circleSolid alcance,
-                Color (withAlpha 0.55 corTextoSuave) $ Translate centroX centroY $ modeloTorre bloco torre True,
+                Color (withAlpha 0.55 corTextoSuave) $ Translate centroX centroY $ modeloTorre (TowerRuntime (fromMaybe (towerIdSpec (towerSpecAproximada torre)) (torreSelecionadaId e)) 1 Nothing) bloco True,
                 if valido
                   then Blank
                   else Color (withAlpha 0.85 cor) $ Translate centroX centroY $ Pictures [
@@ -438,48 +442,46 @@ desenhaTorreSprite e torre =
   let cfg = layoutRender e
       bloco = calculaTamanhoBloco cfg (mapaJogo (jogo e))
       (posX, posY) = posicaoMapaParaEcra cfg (mapaJogo (jogo e)) (posicaoTorre torre)
-   in Translate posX posY $ modeloTorre bloco torre False
+      runtime = towerRuntimeDaTorre (registoTorres e) torre
+   in Translate posX posY $ modeloTorre runtime bloco False
 
-modeloTorre :: Float -> Torre -> Bool -> Picture
-modeloTorre bloco torre selecionada =
+modeloTorre :: TowerRuntime -> Float -> Bool -> Picture
+modeloTorre runtime bloco selecionada =
   let corpo = makeColorI 66 72 69 255
       sombra = makeColorI 14 18 16 170
       metalClaro = makeColorI 186 192 184 255
       metalEscuro = makeColorI 38 43 41 255
-      projetil = projetilTorre torre
-      tipo = tipoProjetil projetil
-      raridade = raridadeTorreAproximada torre
-      acento = case tipo of
-        Resina -> makeColorI 145 107 61 255
-        Gelo -> makeColorI 111 150 168 255
-        Fogo -> makeColorI 175 88 58 255
-        Medo -> makeColorI 170 132 210 255
-        Veneno -> makeColorI 101 168 92 255
-        Eletrico -> makeColorI 226 194 95 255
+      spec = towerSpec (runtimeTowerId runtime)
+      raridade = raridadeTowerSpec spec
+      (r, g, b) = corTowerSpec spec
+      acento = makeColorI r g b 255
       basePlate = case raridade of
         Comum -> makeColorI 88 98 86 255
         Raro -> makeColorI 86 108 129 255
         Epico -> makeColorI 107 88 132 255
         Lendario -> makeColorI 146 106 58 255
         Mitico -> makeColorI 168 84 108 255
-      nivelVisual = nivelVisualTorre torre
+      nivelVisual = min 3 (max 0 (runtimeLevel runtime - 1))
       escala = bloco / 28
       aro = if selecionada
             then Color (makeColorI 226 194 95 255) $ rectangleWire (bloco * 0.92) (bloco * 0.92)
             else Blank
-      topo = case tipo of
-        Resina -> Pictures [Color acento $ Translate 0 12 $ ThickCircle 4 4, Color metalClaro $ Translate 0 12 $ circleSolid 2]
-        Gelo -> Pictures [
+      topo = case formaTowerSpec spec of
+        FormaSentinela -> Pictures [Color acento $ Translate 0 12 $ ThickCircle 4 4, Color metalClaro $ Translate 0 12 $ circleSolid 2]
+        FormaCristal -> Pictures [
           Color acento $ Translate 0 12 $ Polygon [(-7,-3),(0,8),(7,-3),(0,-8)],
           Color metalClaro $ Translate 0 12 $ rectangleSolid 2 13
           ]
-        Fogo -> Pictures [
+        FormaBraseiro -> Pictures [
           Color acento $ Translate 0 12 $ Polygon [(-7,-5),(0,9),(7,-5)],
           Color (makeColorI 226 194 95 255) $ Translate 0 12 $ Polygon [(-3,-2),(0,5),(3,-2)]
           ]
-        Medo -> Pictures [Color acento $ Translate 0 12 $ ThickCircle 6 3, Color acento $ Translate 0 12 $ rectangleSolid 12 2]
-        Veneno -> Pictures [Color acento $ Translate 0 12 $ circleSolid 6, Color (withAlpha 0.55 metalClaro) $ Translate (-2) 14 $ circleSolid 2]
-        Eletrico -> Color acento $ Translate 0 12 $ ThickCircle 5 3
+        FormaOrbe -> Pictures [Color acento $ Translate 0 12 $ ThickCircle 6 3, Color acento $ Translate 0 12 $ rectangleSolid 12 2]
+        FormaFrasco -> Pictures [Color acento $ Translate 0 12 $ circleSolid 6, Color (withAlpha 0.55 metalClaro) $ Translate (-2) 14 $ circleSolid 2]
+        FormaBobina -> Pictures [Color acento $ Translate 0 12 $ ThickCircle 5 3, Color metalClaro $ Translate 0 12 $ rectangleSolid 3 18]
+        FormaCanhao -> Pictures [Color metalEscuro $ Translate 4 13 $ rectangleSolid 18 7, Color acento $ Translate (-7) 13 $ circleSolid 5]
+        FormaSolar -> Pictures [Color acento $ Translate 0 12 $ circleSolid 5, Color (withAlpha 0.8 metalClaro) $ Translate 0 12 $ ThickCircle 9 2]
+        FormaTempestade -> Pictures [Color acento $ Translate 0 12 $ ThickCircle 8 3, Color metalClaro $ Translate 0 12 $ Polygon [(-3,-8),(4,0),(-1,0),(4,8),(-6,1),(0,1)]]
       extraNivel1 =
         if nivelVisual >= 1
           then Pictures
@@ -501,6 +503,19 @@ modeloTorre bloco torre selecionada =
             , Color (withAlpha 0.9 acento) $ Translate 0 18 $ Polygon [(-5,0),(0,5),(5,0),(0,-4)]
             ]
           else Blank
+      extraEspecializacao = case runtimeSpecialization runtime of
+        Nothing -> Blank
+        Just EspecializacaoA ->
+          Pictures
+            [ Color (withAlpha 0.9 acento) $ Translate (-12) 2 $ Polygon [(-3,-8),(3,-8),(5,8),(-5,8)]
+            , Color (withAlpha 0.9 acento) $ Translate 12 2 $ Polygon [(-3,-8),(3,-8),(5,8),(-5,8)]
+            ]
+        Just EspecializacaoB ->
+          Pictures
+            [ Color (withAlpha 0.9 acento) $ Translate (-11) 11 $ circleSolid 3
+            , Color (withAlpha 0.9 acento) $ Translate 11 11 $ circleSolid 3
+            , Color (withAlpha 0.55 acento) $ ThickCircle 13 2
+            ]
       extraRaridade = case raridade of
         Comum -> Blank
         Raro ->
@@ -536,22 +551,10 @@ modeloTorre bloco torre selecionada =
           extraRaridade,
           extraNivel1,
           extraNivel2,
-          extraNivel3
+          extraNivel3,
+          extraEspecializacao
         ]
       ]
-
-nivelVisualTorre :: Torre -> Int
-nivelVisualTorre torre
-  | score >= 7.8 = 3
-  | score >= 5.6 = 2
-  | score >= 4.0 = 1
-  | otherwise = 0
-  where
-    score =
-      danoTorre torre / 18
-        + alcanceTorre torre / 4.5
-        + fromIntegral (rajadaTorre torre) * 0.55
-        + max 0 (1.7 - cicloTorre torre) * 1.5
 
 -- Barra de cooldown acima da torre
 desenhaCooldownTorre :: MapLayoutConfig -> Mapa -> Torre -> Picture
@@ -587,18 +590,52 @@ desenhaInimigoSprite e inimigo =
   let cfg = layoutRender e
       bloco = calculaTamanhoBloco cfg (mapaJogo (jogo e))
       (posX, posY) = posicaoMapaParaEcra cfg (mapaJogo (jogo e)) (posicaoInimigo inimigo)
-   in Translate posX posY $ modeloInimigo bloco
+   in Translate posX posY $ modeloInimigo bloco inimigo
 
-modeloInimigo :: Float -> Picture
-modeloInimigo bloco =
-  let pele = makeColorI 114 86 70 255
+modeloInimigo :: Float -> Inimigo -> Picture
+modeloInimigo bloco inimigo =
+  let spec = enemySpec (enemyClassOf inimigo)
+      (r, g, b) = corEnemySpec spec
+      pele = makeColorI r g b 255
       contorno = makeColorI 39 31 29 255
       olho = makeColorI 222 198 118 255
-      escala = bloco / 24
+      tamanho = case formaEnemySpec spec of
+        FormaVeloz -> 0.82
+        FormaPesada -> 1.14
+        FormaBlindada -> 1.12
+        FormaElite -> 1.16
+        FormaBossA -> 1.38
+        FormaBossG -> 1.48
+        FormaBossR -> 1.42
+        _ -> 1
+      escala = bloco / 24 * tamanho
+      corpo = case formaEnemySpec spec of
+        FormaVeloz -> Polygon [(-10,-6),(8,-8),(11,0),(8,8),(-10,6),(-6,0)]
+        FormaPesada -> rectangleSolid 19 17
+        FormaBlindada -> Polygon [(-10,-6),(-6,-10),(6,-10),(10,-6),(10,6),(6,10),(-6,10),(-10,6)]
+        FormaRegeneradora -> ThickCircle 7 5
+        FormaDispersora -> Polygon [(0,10),(9,3),(6,-9),(-6,-9),(-9,3)]
+        FormaEscudo -> Polygon [(0,11),(10,5),(8,-8),(0,-11),(-8,-8),(-10,5)]
+        FormaElite -> Polygon [(0,11),(10,0),(7,-9),(-7,-9),(-10,0)]
+        FormaBossA -> Polygon [(-12,-7),(9,-10),(13,0),(9,10),(-12,7),(-7,0)]
+        FormaBossG -> rectangleSolid 22 20
+        FormaBossR -> ThickCircle 8 7
+        FormaRedonda -> circleSolid 9
+      detalhe = case formaEnemySpec spec of
+        FormaBlindada -> Color (withAlpha 0.8 (makeColorI 207 214 211 255)) $ rectangleWire 16 14
+        FormaRegeneradora -> Color (makeColorI 174 225 166 255) $ rectangleSolid 3 13
+        FormaDispersora -> Color (withAlpha 0.75 white) $ ThickCircle 11 2
+        FormaEscudo -> Color (withAlpha 0.7 (makeColorI 132 205 235 255)) $ ThickCircle 12 3
+        FormaElite -> Color (makeColorI 235 194 96 255) $ Translate 0 9 $ Polygon [(-4,0),(0,5),(4,0)]
+        FormaBossA -> Color (makeColorI 238 173 92 255) $ Translate (-11) 0 $ Polygon [(-5,-4),(1,0),(-5,4)]
+        FormaBossG -> Color (makeColorI 180 210 224 255) $ rectangleWire 20 18
+        FormaBossR -> Color (makeColorI 225 151 235 255) $ ThickCircle 13 3
+        _ -> Blank
    in Scale escala escala $ Pictures [
-        Color (withAlpha 0.35 black) $ Translate 2 (-3) $ circleSolid 10,
-        Color contorno $ circleSolid 10,
-        Color pele $ circleSolid 8,
+        Color (withAlpha 0.35 black) $ Translate 2 (-3) corpo,
+        Color contorno corpo,
+        Scale 0.82 0.82 $ Color pele corpo,
+        detalhe,
         Color olho $ Translate (-3) 2 $ circleSolid 1.6,
         Color olho $ Translate 3 2 $ circleSolid 1.6,
         Color contorno $ Translate 0 (-3) $ rectangleSolid 8 2
@@ -650,8 +687,20 @@ desenhaEfeitosInimigo e inimigo =
         then Color (withAlpha 0.8 (makeColorI 226 194 95 255)) $
                Translate posX posY $ Line [(-bloco/4, -bloco/4), (0, bloco/4), (bloco/5, 0), (bloco/3, bloco/3)]
         else Blank
+      classe = enemyClassOf inimigo
+      pulso = 0.78 + 0.22 * sin (tempo e * 2.4)
+      auraGuardiao = if classe == BossGuardiao
+        then Color (withAlpha 0.38 (makeColorI 132 205 235 255)) $
+               Translate posX posY $ ThickCircle (bloco * raioAuraGuardiao * pulso) 2.4
+        else Blank
+      zonaRuptura = if classe == BossRuptura
+        then Translate posX posY $ Pictures
+               [ Color (withAlpha 0.24 (makeColorI 225 151 235 255)) $ ThickCircle (bloco * raioZonaRuptura) 2.2
+               , Color (withAlpha 0.16 (makeColorI 225 151 235 255)) $ ThickCircle (bloco * raioZonaRuptura * 0.72 * pulso) 1.6
+               ]
+        else Blank
    
-   in Pictures [efeitoFogo, efeitoGelo, efeitoResina, efeitoMedo, efeitoVeneno, efeitoEletrico]
+   in Pictures [auraGuardiao, zonaRuptura, efeitoFogo, efeitoGelo, efeitoResina, efeitoMedo, efeitoVeneno, efeitoEletrico]
 
 -- Barra de vida acima do inimigo
 desenhaBarraVida :: MapLayoutConfig -> Mapa -> Inimigo -> Picture
@@ -850,9 +899,9 @@ desenhaPainelLateral e =
       resumo = waveSummary e
       torreSel = torreSelecionada e
       torreAtiva = torreFocada e >>= \pos -> findTorreNaPosicao pos (torresJogo (jogo e))
-      x = larguraJanela / 2 - 186
-      y = 8
-      secX = x - 120
+      UIRect x y panelW panelH = gamePanelRect
+      top = y + panelH / 2
+      secX = x - panelW / 2 + 30
       stats =
         [ ("Vida", show (floor (vidaBase base) :: Int))
         , ("Creditos", show (creditosBase base))
@@ -862,62 +911,117 @@ desenhaPainelLateral e =
         , ("Vel", show (round (velocidadeJogo e) :: Int) ++ "x")
         ]
       drawStat i (rotulo, valor) =
-        let rowY = y + 112 - fromIntegral i * 28
+        let rowY = top - 170 - fromIntegral i * 28
          in Pictures
               [ drawGlossBody secX rowY 0.07 (makeColorI 154 164 146 255) rotulo
               , drawGlossBody (secX + 104) rowY 0.076 corTextoSuave valor
               ]
-      towerHeader = drawGlossBody secX (y - 52) 0.07 (makeColorI 154 164 146 255) "TORRE"
+      towerHeader = drawGlossBody secX (top - 354) 0.07 (makeColorI 154 164 146 255) "TORRE"
       towerInfo = case torreAtiva of
         Just torre ->
-          let previa = upgradeTorre torre
-              spec = towerSpecAproximada torre
-              custo = custoUpgradeTorre torre
-              upgradeHover = maybe False (`containsPoint` upgradeRect) (posicaoRato e)
+          let runtime = towerRuntimeDaTorre (registoTorres e) torre
+              spec = towerSpec (runtimeTowerId runtime)
+              previa = upgradeTorreRuntime runtime torre
+              custo = custoUpgradeRuntime runtime torre
+              upgradeHover =
+                maybe
+                  False
+                  (\pos -> any (containsPoint pos) [upgradeRect, specializationARect, specializationBRect])
+                  (posicaoRato e)
               corPreview = if upgradeHover then makeColorI 239 226 153 255 else makeColorI 189 198 180 255
-           in [ drawGlossTitle secX (y - 84) 0.115 (makeColorI 226 194 95 255) (nomeTowerSpec spec)
-              , drawGlossBody secX (y - 110) 0.064 (corRaridade (raridadeTowerSpec spec)) (nomeRaridadeUI (raridadeTowerSpec spec) ++ "  |  " ++ nomeProjetil (projetilTorre torre))
-              , drawGlossBody secX (y - 138) 0.072 corTextoSuave ("Dano " ++ show (floor $ danoTorre torre :: Int) ++ "  |  Alcance " ++ show (floor $ alcanceTorre torre :: Int))
-              , drawGlossBody secX (y - 166) 0.072 corTextoSuave ("Rajada " ++ show (rajadaTorre torre) ++ "  |  Ciclo " ++ showTempoCurto (cicloTorre torre))
-              , drawGlossBody secX (y - 194) 0.068 corTextoSuave ("Efeito " ++ showDuracaoProjetil (projetilTorre torre) ++ "  |  Venda " ++ show (valorVendaTorre torre))
-              , drawGlossBody secX (y - 226) 0.068 corPreview ("Upgrade +" ++ show (floor (danoTorre previa - danoTorre torre) :: Int) ++ " dano  +" ++ showDeltaFloat (alcanceTorre previa - alcanceTorre torre) ++ " alcance")
-              , drawGlossBody secX (y - 252) 0.068 corPreview ("Ciclo " ++ showTempoCurto (cicloTorre torre) ++ " -> " ++ showTempoCurto (cicloTorre previa))
-              , drawGlossBody secX (y - 278) 0.068 corPreview ("Efeito " ++ showDuracaoProjetil (projetilTorre torre) ++ " -> " ++ showDuracaoProjetil (projetilTorre previa) ++ "  |  Custo " ++ show custo)
-              ]
+              dps = danoTorre torre * fromIntegral (rajadaTorre torre) / max 0.1 (cicloTorre torre)
+              venda = valorVendaRuntime runtime torre
+              previewLinhas
+                | precisaEspecializacao runtime =
+                    let custoA = fromMaybe 0 (custoEspecializacao EspecializacaoA runtime torre)
+                        custoB = fromMaybe 0 (custoEspecializacao EspecializacaoB runtime torre)
+                     in [ drawGlossBody secX (top - 526) 0.06 (makeColorI 239 226 153 255) ("DANO+  dano/alcance  " ++ show custoA)
+                        , drawGlossBody secX (top - 552) 0.06 (makeColorI 168 205 226 255) ("RAPIDA  rajada/ciclo  " ++ show custoB)
+                        , drawGlossBody secX (top - 578) 0.058 corTextoSuave "Escolha permanente"
+                        ]
+                | otherwise =
+                    case (previa, custo) of
+                      (Just torreNova, Just custoNovo) ->
+                        [ drawGlossBody secX (top - 526) 0.062 corPreview ("+" ++ show (floor (danoTorre torreNova - danoTorre torre) :: Int) ++ " dano  +" ++ showDeltaFloat (alcanceTorre torreNova - alcanceTorre torre) ++ " alcance")
+                        , drawGlossBody secX (top - 552) 0.062 corPreview ("Ciclo " ++ showTempoCurto (cicloTorre torre) ++ " -> " ++ showTempoCurto (cicloTorre torreNova))
+                        , drawGlossBody secX (top - 578) 0.062 corPreview ("Nivel " ++ show (runtimeLevel runtime + 1) ++ "  |  " ++ show custoNovo ++ " cred")
+                        ]
+                      _ -> [drawGlossBody secX (top - 548) 0.072 (makeColorI 226 194 95 255) "NIVEL MAXIMO"]
+           in [ drawGlossTitle secX (top - 386) 0.105 (makeColorI 226 194 95 255) (nomeTowerSpec spec)
+              , drawGlossBody secX (top - 412) 0.06 (corRaridade (raridadeTowerSpec spec)) (nomeRaridadeUI (raridadeTowerSpec spec) ++ "  |  NIVEL " ++ show (runtimeLevel runtime) ++ "/" ++ show (nivelMaximoTowerSpec spec))
+              , drawGlossBody secX (top - 442) 0.066 corTextoSuave ("Dano " ++ show (floor $ danoTorre torre :: Int) ++ "  |  DPS ~" ++ show (floor dps :: Int))
+              , drawGlossBody secX (top - 470) 0.066 corTextoSuave ("Alcance " ++ show (floor $ alcanceTorre torre :: Int) ++ "  |  Ciclo " ++ showTempoCurto (cicloTorre torre))
+              , drawGlossBody secX (top - 498) 0.06 corTextoSuave (nomePrioridade (prioridadeTowerSpec spec) ++ "  |  Venda " ++ show venda)
+              ] ++ previewLinhas
         Nothing -> case torreSel of
           Just torre ->
-            let spec = towerSpecAproximada torre
-             in [ drawGlossTitle secX (y - 84) 0.115 (makeColorI 226 194 95 255) ("Comprar " ++ nomeTowerSpec spec)
-                , drawGlossBody secX (y - 110) 0.064 (corRaridade (raridadeTowerSpec spec)) (nomeRaridadeUI (raridadeTowerSpec spec) ++ "  |  " ++ nomeProjetilCurto (projetilTorre torre))
-                , drawGlossBody secX (y - 138) 0.072 corTextoSuave ("Dano " ++ show (floor $ danoTorre torre :: Int) ++ "  |  Alcance " ++ show (floor $ alcanceTorre torre :: Int))
-                , drawGlossBody secX (y - 166) 0.072 corTextoSuave ("Rajada " ++ show (rajadaTorre torre) ++ "  |  Efeito " ++ showDuracaoProjetil (projetilTorre torre))
-                , drawGlossBody secX (y - 194) 0.072 corTextoSuave "Clique na relva para colocar"
+            let spec = towerSpec (fromMaybe (towerIdSpec (towerSpecAproximada torre)) (torreSelecionadaId e))
+             in [ drawGlossTitle secX (top - 386) 0.105 (makeColorI 226 194 95 255) ("Comprar " ++ nomeTowerSpec spec)
+                , drawGlossBody secX (top - 412) 0.06 (corRaridade (raridadeTowerSpec spec)) (nomeRaridadeUI (raridadeTowerSpec spec) ++ "  |  " ++ nomeProjetilCurto (projetilTorre torre))
+                , drawGlossBody secX (top - 442) 0.066 corTextoSuave ("Dano " ++ show (floor $ danoTorre torre :: Int) ++ "  |  Alcance " ++ show (floor $ alcanceTorre torre :: Int))
+                , drawGlossBody secX (top - 470) 0.066 corTextoSuave ("Rajada " ++ show (rajadaTorre torre) ++ "  |  Efeito " ++ showDuracaoProjetil (projetilTorre torre))
+                , drawGlossBody secX (top - 500) 0.066 corTextoSuave "Clique na relva para colocar"
                 ]
           Nothing ->
-            [ drawGlossTitle secX (y - 84) 0.115 (makeColorI 176 184 171 255) "Sem selecao"
-            , drawGlossBody secX (y - 118) 0.072 corTextoSuave "Escolhe uma torre do arsenal"
-            , drawGlossBody secX (y - 146) 0.072 corTextoSuave "ou clica numa torre no mapa"
+            [ drawGlossTitle secX (top - 386) 0.105 (makeColorI 176 184 171 255) "Sem selecao"
+            , drawGlossBody secX (top - 422) 0.066 corTextoSuave "Escolhe uma torre do arsenal"
+            , drawGlossBody secX (top - 450) 0.066 corTextoSuave "ou clica numa torre no mapa"
             ]
       botoesPainel = case (torreAtiva, torreSel) of
-        (Just _, _) ->
-          [ drawButton (posicaoRato e) upgradeRect Primary "UPGRADE"
-          , drawButton (posicaoRato e) sellRect Danger "VENDER"
-          , drawButton (posicaoRato e) cancelRect Neutral "LIMPAR"
-          ]
+        (Just torre, _) ->
+          let runtime = towerRuntimeDaTorre (registoTorres e) torre
+              upgradeTone = if runtimeLevel runtime >= nivelMaximoTowerSpec (towerSpec (runtimeTowerId runtime)) then Disabled else Primary
+           in ( if precisaEspecializacao runtime
+                  then
+                    [ drawButton (posicaoRato e) specializationARect Primary "DANO+"
+                    , drawButton (posicaoRato e) specializationBRect Neutral "RAPIDA"
+                    ]
+                  else [drawButton (posicaoRato e) upgradeRect upgradeTone "UPGRADE"]
+              )
+                ++ [ drawButton (posicaoRato e) sellRect Danger "VENDER"
+                   , drawButton (posicaoRato e) cancelRect Neutral "LIMPAR"
+                   ]
         (Nothing, Just _) ->
           [ drawButton (posicaoRato e) cancelRect Neutral "LIMPAR" ]
         _ -> []
    in Pictures [
-        Color (withAlpha 0.94 corPainel) $ Translate x y $ rectangleSolid 300 476,
-        Color (makeColorI 68 78 63 255) $ Translate x y $ rectangleWire 300 476,
-        drawGlossTitle secX (y + 154) 0.13 (makeColorI 226 194 95 255) "PAINEL",
-        drawGlossBody secX (y + 126) 0.068 (makeColorI 154 164 146 255) ("Mapa " ++ nomeMapa (mapaAtual e) ++ "  |  " ++ capituloEstagioTexto (progressoMeta e)),
+        Color (withAlpha 0.94 corPainel) $ Translate x y $ rectangleSolid panelW panelH,
+        Color (makeColorI 68 78 63 255) $ Translate x y $ rectangleWire panelW panelH,
+        drawGlossTitle secX (top - 44) 0.125 (makeColorI 226 194 95 255) "PAINEL",
+        drawGlossBody secX (top - 76) 0.06 corTextoSuave ("MAPA  " ++ nomeMapa (mapaAtual e)),
+        drawGlossBody secX (top - 102) 0.06 (makeColorI 154 164 146 255) (capituloEstagioTexto (progressoMeta e)),
+        drawGlossBody secX (top - 130) 0.058 (makeColorI 226 194 95 255) (resumoProximaVaga resumo),
         Pictures [drawStat i item | (i, item) <- zip [0 :: Int ..] stats],
-        Color (withAlpha 0.16 (makeColorI 176 184 171 255)) $ Translate x (y - 30) $ rectangleSolid 244 2,
+        Color (withAlpha 0.16 (makeColorI 176 184 171 255)) $ Translate x (top - 330) $ rectangleSolid (panelW - 56) 2,
         towerHeader,
         Pictures towerInfo,
         Pictures botoesPainel
       ]
+
+resumoProximaVaga :: WaveSummary -> String
+resumoProximaVaga resumo =
+  let numero = fromMaybe (ondaAtualUI resumo) (proximaOndaUI resumo)
+      entradas = composicaoProximaUI resumo
+      primeiras = take 3 entradas
+      sufixo = if length entradas > 3 then "  +" else ""
+      grupos = intercalate "  " [show quantidade ++ " " ++ siglaEnemy enemyClass | (enemyClass, quantidade) <- primeiras]
+   in if null entradas
+        then "PROX  --"
+        else "PROX W" ++ show numero ++ "  " ++ grupos ++ sufixo
+
+siglaEnemy :: EnemyClass -> String
+siglaEnemy enemyClass = case enemyClass of
+  Basico -> "BAS"
+  Rapido -> "RAP"
+  Tanque -> "TAN"
+  Blindado -> "BLD"
+  Regenerador -> "REG"
+  Dispersor -> "DSP"
+  Protegido -> "ESC"
+  Elite -> "ELT"
+  BossAcelerador -> "B-A"
+  BossGuardiao -> "B-G"
+  BossRuptura -> "B-R"
 
 findTorreNaPosicao :: Posicao -> [Torre] -> Maybe Torre
 findTorreNaPosicao _ [] = Nothing
@@ -925,14 +1029,21 @@ findTorreNaPosicao pos (torre:torres)
   | posicaoTorre torre == pos = Just torre
   | otherwise = findTorreNaPosicao pos torres
 
+nomePrioridade :: TargetPriority -> String
+nomePrioridade prioridade = case prioridade of
+  PrimeiroNaRota -> "ALVO PRIMEIRO"
+  MaisRapido -> "ALVO RAPIDO"
+  MaisVida -> "ALVO RESISTENTE"
+  MaiorGrupo -> "ALVO GRUPO"
+
 -- ============================================================================
 -- LOJA (SHOP) - ATUALIZADA
 -- ============================================================================
 
 desenhaLoja :: ImmutableTowers -> Picture
 desenhaLoja e =
-  let loja = lojaJogo (jogo e)
-      torreSel = torreSelecionada e
+  let loja = shopEntriesParaModo (modoJogoEscolhido e) (progressoMeta e)
+      torreSelId = torreSelecionadaId e
       creditos = creditosBase (baseJogo (jogo e))
       UIRect panelX panelY panelW panelH = shopPanelRect (length loja)
       headerY = panelY + panelH / 2 - 34
@@ -943,17 +1054,17 @@ desenhaLoja e =
           drawGlossBody (panelX - panelW / 2 + 20) (headerY - 28) 0.062 corTextoSuave ("Creditos " ++ show creditos),
           drawGlossBody (panelX - panelW / 2 + 130) (headerY - 28) 0.058 (makeColorI 154 164 146 255) (show (length loja) ++ " torres"),
           Color (withAlpha 0.16 (makeColorI 176 184 171 255)) $ Translate panelX (headerY - 42) $ rectangleSolid (panelW - 32) 2
-        ] ++ zipWith (desenhaBotaoLoja (length loja) torreSel creditos) [0..] loja
+        ] ++ zipWith (desenhaBotaoLoja (length loja) torreSelId creditos) [0..] loja
 
-desenhaBotaoLoja :: Int -> Maybe Torre -> Creditos -> Int -> (Creditos, Torre) -> Picture
-desenhaBotaoLoja total torresel creditos indice (preco, torre) =
+desenhaBotaoLoja :: Int -> Maybe TowerId -> Creditos -> Int -> ShopEntry -> Picture
+desenhaBotaoLoja total towerIdSelecionada creditos indice entrada =
   let (posX, posY) = shopSlotCenter total indice
-      spec = towerSpecAproximada torre
+      towerId = shopTowerId entrada
+      preco = shopPrice entrada
+      torre = shopTower entrada
+      spec = towerSpec towerId
       compravel = creditos >= preco
-      selecionada = case torresel of
-                      Just t -> tipoProjetil (projetilTorre t) == tipoProjetil (projetilTorre torre)
-                        && danoTorre t == danoTorre torre
-                      Nothing -> False
+      selecionada = towerIdSelecionada == Just towerId
       cor = if selecionada then makeColorI 226 194 95 255 else if compravel then makeColorI 92 103 88 255 else makeColorI 78 70 66 255
       corFundo = if selecionada 
                  then makeColorI 55 60 45 235
@@ -969,9 +1080,9 @@ desenhaBotaoLoja total torresel creditos indice (preco, torre) =
         Color corFundo $ rectangleSolid 82 96,
         Color cor $ rectangleWire 82 96,
         if selecionada then Color cor $ rectangleWire 86 100 else Blank,
-        Translate 0 8 $ modeloTorre 42 torre selecionada,
+        Translate 0 8 $ modeloTorre (TowerRuntime towerId 1 Nothing) 42 selecionada,
         if compravel then Blank else Color (withAlpha 0.45 black) $ rectangleSolid 82 96,
-        drawGlossBody (-28) (-33) 0.045 corTextoSuave (nomeProjetilCurto (projetilTorre torre)),
+        drawGlossBody (-28) (-33) 0.045 corTextoSuave (take 5 (nomeTowerSpec spec)),
         drawGlossBody 4 (-33) 0.053 corPreco (show preco),
         drawGlossBody (-26) (-45) 0.036 (corRaridade (raridadeTowerSpec spec)) (siglaRaridade (raridadeTowerSpec spec)),
         textoInfo
@@ -1002,33 +1113,7 @@ corMensagem tipo = case tipo of
   MsgErro -> makeColorI 190 82 72 255
 
 vidaMaxInimigoEstimado :: Inimigo -> Float
-vidaMaxInimigoEstimado inimigo =
-  case candidatos of
-    vidaMax : _ -> max vidaMax (vidaInimigo inimigo)
-    [] -> max 100 (vidaInimigo inimigo)
-  where
-    butim = butimInimigo inimigo
-    ataque = ataqueInimigo inimigo
-    candidatos =
-      [ vidaOriginal nivel False
-        | nivel <- niveisValidos (butim - 14),
-          ataqueBaseCombina nivel
-      ]
-        ++ [ vidaOriginal nivel True
-             | nivel <- niveisValidos (butim - 22),
-               ataqueBrutoCombina nivel
-           ]
-    niveisValidos delta
-      | delta < 0 = []
-      | delta `mod` 4 == 0 = [delta `div` 4]
-      | otherwise = []
-    ataqueBaseCombina nivel =
-      abs (ataque - (8 + fromIntegral nivel * 1.6)) < 0.2
-    ataqueBrutoCombina nivel =
-      abs (ataque - (14 + fromIntegral nivel * 1.6)) < 0.2
-    vidaOriginal nivel bruto =
-      let escala = fromIntegral nivel
-       in 60 + escala * 24 + if bruto then escala * 26 else 0
+vidaMaxInimigoEstimado = vidaMaximaEstimada
 
 nomeProjetil :: Projetil -> String
 nomeProjetil projetil = case tipoProjetil projetil of
@@ -1308,7 +1393,37 @@ carregarImagens = do
       
       (jogoInicial, mapaInicial, totalOndas, metaInicialJogo) = prepararPartida modoGuardado metaGuardado
   
-  return $ ImmutableTowers jogoInicial imgs (MenuInicial Jogar) 0 (round larguraJanela, round alturaJanela) Nothing Nothing Nothing perfilGuardado leaderboardGuardada metaInicialJogo modoGuardado mapaInicial 0 totalOndas False 1 [] False True [] Nothing False 0 False 0
+  return $
+    ImmutableTowers
+      { jogo = jogoInicial,
+        imagens = imgs,
+        modo = MenuInicial Jogar,
+        tempo = 0,
+        janelaAtual = (round larguraJanela, round alturaJanela),
+        torreSelecionada = Nothing,
+        torreSelecionadaId = Nothing,
+        torreFocada = Nothing,
+        registoTorres = emptyTowerRegistry,
+        posicaoRato = Nothing,
+        perfilJogador = perfilGuardado,
+        leaderboardLocal = leaderboardGuardada,
+        progressoMeta = metaInicialJogo,
+        modoJogoEscolhido = modoGuardado,
+        mapaAtual = mapaInicial,
+        ondasSobrevividas = 0,
+        totalOndasPartida = totalOndas,
+        resultadoRegistado = False,
+        velocidadeJogo = 1,
+        mensagensUI = [],
+        hudCompacto = False,
+        lojaVisivel = True,
+        efeitosUpgrade = [],
+        ultimoResumoPartida = Nothing,
+        botAutomatico = False,
+        botCooldown = 0,
+        backspacePerfilAtivo = False,
+        backspacePerfilTimer = 0
+      }
 
 ratoParaCelula :: MapLayoutConfig -> Mapa -> (Float, Float) -> Maybe (Int, Int, Float, Float)
 ratoParaCelula cfg mapa (mx, my) =

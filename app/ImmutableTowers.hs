@@ -3,6 +3,7 @@ module ImmutableTowers where
 import Graphics.Gloss
 import LI12425
 import MetaTypes
+import TowerRuntime
 
 type Imagens = [(Imagem, Maybe Picture)]
 
@@ -13,7 +14,9 @@ data ImmutableTowers = ImmutableTowers
     tempo :: Float,
     janelaAtual :: (Int, Int),
     torreSelecionada :: Maybe Torre,
+    torreSelecionadaId :: Maybe TowerId,
     torreFocada :: Maybe Posicao,
+    registoTorres :: TowerRegistry,
     posicaoRato :: Maybe (Float, Float),
     perfilJogador :: PerfilJogador,
     leaderboardLocal :: [Pontuacao],

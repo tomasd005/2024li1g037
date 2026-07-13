@@ -35,7 +35,18 @@ import Tarefa2
 -- >>> vidaBase (baseJogo jogo') <= vidaBase (baseJogo jogo1)
 -- True
 atualizaJogo :: Tempo -> Jogo -> Jogo
-atualizaJogo tempo jogo =
+atualizaJogo = atualizaJogoComSeletor seletorPadrao
+
+type TargetSelector = Torre -> [(Int, Inimigo)] -> [(Int, Inimigo)]
+type HitResolver = Torre -> Inimigo -> Inimigo
+type EnemyPassive = Tempo -> Inimigo -> Inimigo
+
+atualizaJogoComSeletor :: TargetSelector -> Tempo -> Jogo -> Jogo
+atualizaJogoComSeletor seletor =
+  atualizaJogoComRegras seletor atingeInimigo passivoNeutro
+
+atualizaJogoComRegras :: TargetSelector -> HitResolver -> EnemyPassive -> Tempo -> Jogo -> Jogo
+atualizaJogoComRegras seletor resolveHit aplicaPassivo tempo jogo =
   let -- 1. Atualizar portais e lançar inimigos
       (portaisAtualizados, inimigosLancados) =
         atualizaTodosPortais tempo (portaisJogo jogo)
@@ -44,7 +55,7 @@ atualizaJogo tempo jogo =
       
       -- 2. Atualizar torres e disparar
       (torresAtualizadas, inimigosAposDisparo) =
-        atualizaTodasTorres tempo todosInimigos (torresJogo jogo)
+        atualizaTodasTorresComRegras seletor resolveHit tempo todosInimigos (torresJogo jogo)
       
       -- 3. Remover inimigos que já chegaram à base antes de os mover.
       -- Sem esta separação, um inimigo que começa o ciclo em cima da base pode
@@ -53,12 +64,18 @@ atualizaJogo tempo jogo =
         separaInimigosPorEstado inimigosAposDisparo (posicaoBase (baseJogo jogo))
 
       -- 4. Mover inimigos restantes e aplicar efeitos
-      inimigosMovidos =
-        map (atualizaInimigo tempo (mapaJogo jogo)) inimigosParaMover
+      posicaoBaseJogo = posicaoBase (baseJogo jogo)
+      inimigosMovidos = map (marcaChegadaBase posicaoBaseJogo) inimigosParaMover
+      marcaChegadaBase posBase inimigo =
+        let posicaoInicial = posicaoInimigo inimigo
+            inimigoMovido = atualizaInimigoComPassivo aplicaPassivo tempo (mapaJogo jogo) inimigo
+         in if segmentoAtingeBase posBase posicaoInicial (posicaoInimigo inimigoMovido)
+              then inimigoMovido {posicaoInimigo = posBase}
+              else inimigoMovido
       
       -- 5. Separar inimigos mortos, vivos e que chegaram à base depois de mover
       (inimigosMortosDepoisMovimento, inimigosVivos, inimigosNaBaseDepoisMovimento) =
-        separaInimigosPorEstado inimigosMovidos (posicaoBase (baseJogo jogo))
+        separaInimigosPorEstado inimigosMovidos posicaoBaseJogo
       
       inimigosMortos = inimigosMortosAntesMovimento ++ inimigosMortosDepoisMovimento
       inimigosNaBase = inimigosNaBaseAntesMovimento ++ inimigosNaBaseDepoisMovimento
@@ -151,32 +168,38 @@ processaOndas tempo (onda:ondas) posPortal
 -- >>> length torres' == 1
 -- True
 atualizaTodasTorres :: Tempo -> [Inimigo] -> [Torre] -> ([Torre], [Inimigo])
-atualizaTodasTorres tempo inimigos torres =
+atualizaTodasTorres = atualizaTodasTorresComSeletor seletorPadrao
+
+atualizaTodasTorresComSeletor :: TargetSelector -> Tempo -> [Inimigo] -> [Torre] -> ([Torre], [Inimigo])
+atualizaTodasTorresComSeletor seletor = atualizaTodasTorresComRegras seletor atingeInimigo
+
+atualizaTodasTorresComRegras :: TargetSelector -> HitResolver -> Tempo -> [Inimigo] -> [Torre] -> ([Torre], [Inimigo])
+atualizaTodasTorresComRegras seletor resolveHit tempo inimigos torres =
   let inimigosIndexados = zip [0 :: Int ..] inimigos
       alcanceMaximo = foldr (max . alcanceTorre) 1 torres
       grid = buildSpatialGrid alcanceMaximo inimigosIndexados
       inimigosPorIndice = IntMap.fromAscList inimigosIndexados
       (torresAtualizadas, inimigosAtualizados) =
-        foldr (atualizaTorreComGrid tempo grid) ([], inimigosPorIndice) torres
+        foldr (atualizaTorreComGrid seletor resolveHit tempo grid) ([], inimigosPorIndice) torres
    in (torresAtualizadas, IntMap.elems inimigosAtualizados)
 
-atualizaTorreComGrid :: Tempo -> SpatialGrid -> Torre -> ([Torre], IntMap.IntMap Inimigo) -> ([Torre], IntMap.IntMap Inimigo)
-atualizaTorreComGrid tempo grid torre (torresAtualizadas, inimigosPorIndice) =
+atualizaTorreComGrid :: TargetSelector -> HitResolver -> Tempo -> SpatialGrid -> Torre -> ([Torre], IntMap.IntMap Inimigo) -> ([Torre], IntMap.IntMap Inimigo)
+atualizaTorreComGrid seletor resolveHit tempo grid torre (torresAtualizadas, inimigosPorIndice) =
   let torreComTempoAtualizado = torre {tempoTorre = tempoTorre torre - tempo}
    in if tempoTorre torreComTempoAtualizado <= 0
       then
         let (torreRecarregada, inimigosAposDisparo) =
-              dispararTorreComGrid grid torreComTempoAtualizado inimigosPorIndice
+              dispararTorreComGrid seletor resolveHit grid torreComTempoAtualizado inimigosPorIndice
          in (torreRecarregada : torresAtualizadas, inimigosAposDisparo)
       else (torreComTempoAtualizado : torresAtualizadas, inimigosPorIndice)
 
-dispararTorreComGrid :: SpatialGrid -> Torre -> IntMap.IntMap Inimigo -> (Torre, IntMap.IntMap Inimigo)
-dispararTorreComGrid grid torre inimigosPorIndice =
+dispararTorreComGrid :: TargetSelector -> HitResolver -> SpatialGrid -> Torre -> IntMap.IntMap Inimigo -> (Torre, IntMap.IntMap Inimigo)
+dispararTorreComGrid seletor resolveHit grid torre inimigosPorIndice =
   let candidatos = inimigosNoAlcanceGrid grid torre inimigosPorIndice
-      inimigosOrdenados = sortBy (compare `on` distanciaDaTorreIndice torre) candidatos
+      inimigosOrdenados = seletor torre candidatos
       alvos = take (rajadaTorre torre) inimigosOrdenados
       inimigosAtingidos =
-        foldl' (\acc (indice, inimigo) -> IntMap.insert indice (atingeInimigo torre inimigo) acc) inimigosPorIndice alvos
+        foldl' (\acc (indice, inimigo) -> IntMap.insert indice (resolveHit torre inimigo) acc) inimigosPorIndice alvos
       torreRecarregada = torre {tempoTorre = cicloTorre torre}
    in (torreRecarregada, inimigosAtingidos)
 
@@ -197,6 +220,9 @@ inimigosNoAlcanceGrid grid torre inimigosPorIndice =
 
 distanciaDaTorreIndice :: Torre -> (Int, Inimigo) -> Float
 distanciaDaTorreIndice torre (_, inimigo) = distanciaDaTorre torre inimigo
+
+seletorPadrao :: TargetSelector
+seletorPadrao torre = sortBy (compare `on` distanciaDaTorreIndice torre)
 
 -- | Atualiza uma torre: decrementa tempo e dispara se pronta.
 --
@@ -259,14 +285,21 @@ atualizaInimigos tempo mapa = map (atualizaInimigo tempo mapa)
 -- >>> vidaInimigo inimigo' <= vidaInimigo inimigo1
 -- True
 atualizaInimigo :: Tempo -> Mapa -> Inimigo -> Inimigo
-atualizaInimigo tempo mapa inimigo =
+atualizaInimigo = atualizaInimigoComPassivo passivoNeutro
+
+atualizaInimigoComPassivo :: EnemyPassive -> Tempo -> Mapa -> Inimigo -> Inimigo
+atualizaInimigoComPassivo aplicaPassivo tempo mapa inimigo =
   inimigo
     & atualizaProjetis tempo
     & aplicaEfeitoProjetil tempo
+    & aplicaPassivo tempo
     & moverInimigoSePermitido tempo mapa
     & removeProjeteisExpirados
   where
     (&) = flip ($)
+
+passivoNeutro :: EnemyPassive
+passivoNeutro _ = id
 
 -- | Atualiza durações de todos os projéteis.
 --
@@ -377,6 +410,22 @@ moverInimigo tempo mapa inimigo =
       novaPos = moverNaDirecao (posicaoInimigo inimigo) novaDirecao distancia
    in inimigo {posicaoInimigo = novaPos, direcaoInimigo = novaDirecao}
 
+segmentoAtingeBase :: Posicao -> Posicao -> Posicao -> Bool
+segmentoAtingeBase posBase posicaoInicial posicaoFinal =
+  distanciaPontoSegmentoQuadrada posBase posicaoInicial posicaoFinal <= 0.25
+
+distanciaPontoSegmentoQuadrada :: Posicao -> Posicao -> Posicao -> Float
+distanciaPontoSegmentoQuadrada (px, py) (x1, y1) (x2, y2) =
+  let dx = x2 - x1
+      dy = y2 - y1
+      comprimentoQuadrado = dx * dx + dy * dy
+      fator = if comprimentoQuadrado == 0
+              then 0
+              else ((px - x1) * dx + (py - y1) * dy) / comprimentoQuadrado
+      fatorLimitado = max 0 (min 1 fator)
+      pontoMaisProximo = (x1 + fatorLimitado * dx, y1 + fatorLimitado * dy)
+   in distanciaQuadrada (px, py) pontoMaisProximo
+
 -- | Calcula nova posição baseada na direção e distância.
 --
 -- == Exemplo:
@@ -467,11 +516,14 @@ separaInimigosPorEstado inimigos posBase =
   where
     classificar i (mortos, vivos, naBase)
       | vidaInimigo i <= 0 = (i:mortos, vivos, naBase)
-      | posicaoInimigo i `proxima` posBase = (mortos, vivos, i:naBase)
+      | chegouAosLimitesDaBase (posicaoInimigo i) posBase = (mortos, vivos, i:naBase)
       | otherwise = (mortos, i:vivos, naBase)
-    
-    proxima p1 p2 =
-      distanciaQuadrada p1 p2 < 0.25
+
+    chegouAosLimitesDaBase p1 p2 =
+      distanciaQuadrada p1 p2 < 0.25 || mesmaCelula p1 p2
+
+    mesmaCelula (x1, y1) (x2, y2) =
+      (floor x1 :: Int) == floor x2 && (floor y1 :: Int) == floor y2
 
 -- | Verifica se inimigo morreu.
 --

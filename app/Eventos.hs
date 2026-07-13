@@ -2,6 +2,7 @@ module Eventos where
 
 import BotSystem
 import Data.List
+import Data.Maybe (fromMaybe)
 import GameFactory
 import Graphics.Gloss.Interface.IO.Game
 import ImmutableTowers
@@ -13,6 +14,7 @@ import RenderConfig
 import SaveSystem
 import System.Exit (exitSuccess)
 import TowerSystem
+import TowerRuntime
 import UIComponents
 import UIRects
 
@@ -154,24 +156,38 @@ reage (EventKey (Char 'f') Down _ _) e@ImmutableTowers {modo = MostrarLojaMeta, 
 reage (EventKey (Char 'u') Down _ _) estado@ImmutableTowers {jogo = jogoAtual, modo = EmJogo, torreFocada = foco} =
   return $ upgradeSelecionada estado jogoAtual foco
 reage (EventKey (Char 's') Down _ _) estado@ImmutableTowers {jogo = jogoAtual, modo = EmJogo} = do
-  guardarJogoLocal jogoAtual
+  guardarJogoLocal jogoAtual (registoTorres estado)
   return $ adicionaMensagem MsgSucesso "Jogo guardado" estado
 reage (EventKey (Char 'l') Down _ _) estado = do
   guardado <- carregarJogoLocal
   case guardado of
-    Just jogoGuardado -> return estado {jogo = jogoGuardado, modo = EmJogo, torreSelecionada = Nothing, torreFocada = Nothing, efeitosUpgrade = []}
+    Just (jogoGuardado, registry) ->
+      return
+        estado
+          { jogo = jogoGuardado,
+            modo = EmJogo,
+            torreSelecionada = Nothing,
+            torreSelecionadaId = Nothing,
+            torreFocada = Nothing,
+            registoTorres = registry,
+            efeitosUpgrade = []
+          }
     Nothing -> return estado
 reage (EventKey (Char 'b') Down _ _) estado@ImmutableTowers {jogo = jogoAtual, modo = EmJogo} =
-  return $ adicionaMensagem MsgInfo "Bot sugeriu uma construcao" estado {jogo = botColocaTorre jogoAtual}
+  let jogoNovo = botColocaTorre jogoAtual
+      registry = reconcileTowerRegistry (registoTorres estado) (torresJogo jogoNovo)
+   in return $ adicionaMensagem MsgInfo "Bot sugeriu uma construcao" estado {jogo = jogoNovo, registoTorres = registry}
 reage (EventKey (Char 'o') Down _ _) estado@ImmutableTowers {jogo = jogoAtual, modo = EmJogo, posicaoRato = rato} =
   return $ case rato of
     Just pos -> adicionaMensagem MsgAviso "Obstaculo colocado" estado {jogo = jogoAtual {mapaJogo = Editor.colocaObstaculo (layoutAtual estado) pos (mapaJogo jogoAtual)}}
     Nothing -> estado
 reage (EventKey (MouseButton LeftButton) Down _ posBruto) estado@ImmutableTowers {jogo = jogoAtual, modo = EditorMapa} =
   let pos = normalizaUIPos estado posBruto
-   in return estado {jogo = jogoAtual {mapaJogo = Editor.cicloCelulaMapa (layoutAtual estado) pos (mapaJogo jogoAtual)}}
+   in return $ case Editor.cicloCelulaMapaValidado (layoutAtual estado) pos jogoAtual of
+        Right jogoNovo -> adicionaMensagem MsgSucesso "Mapa atualizado" estado {jogo = jogoNovo}
+        Left erro -> adicionaMensagem MsgAviso erro estado
 reage (EventKey (MouseButton RightButton) Down _ _) estado@ImmutableTowers {modo = EmJogo} =
-  return estado {torreSelecionada = Nothing, torreFocada = Nothing}
+  return estado {torreSelecionada = Nothing, torreSelecionadaId = Nothing, torreFocada = Nothing}
 reage (EventKey (MouseButton LeftButton) Down _ posBruto) estado@ImmutableTowers {jogo = jogoAtual, modo = EmJogo, torreSelecionada = Nothing} =
   let pos@(mx, my) = normalizaUIPos estado posBruto
    in
@@ -212,6 +228,26 @@ reage (EventKey (MouseButton LeftButton) Down _ posBruto) estado@ImmutableTowers
    in return $ case acaoResultadoClicada pos estado of
     Just novoEstado -> novoEstado
     Nothing -> estado
+reage (EventKey (MouseButton LeftButton) Down _ posBruto) e =
+  let pos = normalizaUIPos e posBruto
+   in case modo e of
+        TutorialFoto -> voltaSeClicou pos submenuBackRect e
+        MostrarPerfil -> voltaSeClicou pos submenuBackRect e
+        MostrarLeaderboard -> voltaSeClicou pos submenuBackRect e
+        MostrarOpcoes -> voltaSeClicou pos optionsBackRect e
+        MostrarLojaMeta -> voltaSeClicou pos shopBackRect e
+        _ -> return e
+  where
+    voltaSeClicou pos rect estado
+      | pos `containsPoint` rect = return estado {modo = menuAnterior (modo estado)}
+      | otherwise = return estado
+    menuAnterior estadoAtual = case estadoAtual of
+      TutorialFoto -> MenuInicial Creditos
+      MostrarPerfil -> MenuInicial Perfil
+      MostrarLeaderboard -> MenuInicial Leaderboard
+      MostrarOpcoes -> MenuInicial Opcoes
+      MostrarLojaMeta -> MenuInicial LojaMeta
+      _ -> MenuInicial Jogar
 reage _ estado = return estado
 
 apagarCaracterPerfil :: Bool -> ImmutableTowers -> IO ImmutableTowers
@@ -220,7 +256,7 @@ apagarCaracterPerfil ativar estado =
     MostrarPerfil ->
       let perfil = perfilJogador estado
           nomeAtual = nomeJogador perfil
-          novoPerfil = perfil {nomeJogador = if null nomeAtual then nomeAtual else init nomeAtual}
+          novoPerfil = perfil {nomeJogador = maybe nomeAtual fst (unsnoc nomeAtual)}
        in do
             guardarMetaEstado novoPerfil (leaderboardLocal estado) (modoJogoEscolhido estado) (progressoMeta estado)
             return estado {perfilJogador = novoPerfil, backspacePerfilAtivo = ativar, backspacePerfilTimer = 0.22}
@@ -235,16 +271,18 @@ acaoJogoClicada pos estado
   | pos `containsPoint` autoBotRect = Just (toggleBotAutomatico estado)
   | pos `containsPoint` hudToggleRect = Just estado {hudCompacto = not (hudCompacto estado)}
   | pos `containsPoint` shopToggleRect = Just estado {lojaVisivel = not (lojaVisivel estado)}
+  | not (hudCompacto estado) && pos `containsPoint` specializationARect = Just (especializaSelecionada EspecializacaoA estado)
+  | not (hudCompacto estado) && pos `containsPoint` specializationBRect = Just (especializaSelecionada EspecializacaoB estado)
   | not (hudCompacto estado) && pos `containsPoint` upgradeRect = Just (upgradeSelecionada estado (jogo estado) (torreFocada estado))
   | not (hudCompacto estado) && pos `containsPoint` sellRect = Just (vendeTorreSelecionada estado)
-  | not (hudCompacto estado) && pos `containsPoint` cancelRect = Just estado {torreSelecionada = Nothing, torreFocada = Nothing}
+  | not (hudCompacto estado) && pos `containsPoint` cancelRect = Just estado {torreSelecionada = Nothing, torreSelecionadaId = Nothing, torreFocada = Nothing}
   | otherwise = Nothing
 
 acaoPausaClicada :: (Float, Float) -> ImmutableTowers -> Maybe ImmutableTowers
 acaoPausaClicada pos estado
   | pos `containsPoint` resumeRect = Just (adicionaMensagem MsgInfo "Continuar" estado {modo = EmJogo})
   | pos `containsPoint` restartRect = Just (adicionaMensagem MsgInfo "Partida reiniciada" (iniciarPartida estado))
-  | pos `containsPoint` menuRect = Just estado {modo = MenuInicial Jogar, torreSelecionada = Nothing, torreFocada = Nothing}
+  | pos `containsPoint` menuRect = Just estado {modo = MenuInicial Jogar, torreSelecionada = Nothing, torreSelecionadaId = Nothing, torreFocada = Nothing}
   | otherwise = Nothing
 
 acaoResultadoClicada :: (Float, Float) -> ImmutableTowers -> Maybe ImmutableTowers
@@ -270,12 +308,14 @@ vendeTorreSelecionada estado =
     Just pos ->
       let jogoAtual = jogo estado
           (vendidas, restantes) = partition ((== pos) . posicaoTorre) (torresJogo jogoAtual)
-          refund = sum (map valorVendaTorre vendidas)
+          registry = registoTorres estado
+          refund = sum [valorVendaRuntime (towerRuntimeDaTorre registry torre) torre | torre <- vendidas]
+          registryAtualizado = foldr (removeTower . posicaoTorre) registry vendidas
           base = baseJogo jogoAtual
           baseAtualizada = base {creditosBase = creditosBase base + refund}
        in if null vendidas
           then adicionaMensagem MsgAviso "Nenhuma torre selecionada" estado
-          else adicionaMensagem MsgSucesso ("Torre vendida +" ++ show refund) estado {jogo = jogoAtual {torresJogo = restantes, baseJogo = baseAtualizada}, torreFocada = Nothing}
+          else adicionaMensagem MsgSucesso ("Torre vendida +" ++ show refund) estado {jogo = jogoAtual {torresJogo = restantes, baseJogo = baseAtualizada}, registoTorres = registryAtualizado, torreFocada = Nothing}
 
 adicionaMensagem :: TipoMensagem -> String -> ImmutableTowers -> ImmutableTowers
 adicionaMensagem tipo texto estado =
@@ -301,7 +341,9 @@ iniciarPartida e =
               modo = EmJogo,
               tempo = 0,
               torreSelecionada = Nothing,
+              torreSelecionadaId = Nothing,
               torreFocada = Nothing,
+              registoTorres = emptyTowerRegistry,
               progressoMeta = metaNovo,
               mapaAtual = mapaId,
               ondasSobrevividas = 0,
@@ -323,6 +365,7 @@ voltarAoMenuPosPartida estado =
   estado
     { modo = MenuInicial Jogar,
       torreSelecionada = Nothing,
+      torreSelecionadaId = Nothing,
       torreFocada = Nothing,
       botAutomatico = False,
       botCooldown = 0
@@ -339,15 +382,46 @@ upgradeSelecionada estado jogoAtual foco =
   case foco >>= procurarTorreAtualizavel (torresJogo jogoAtual) of
     Nothing -> adicionaMensagem MsgAviso "Seleciona uma torre para melhorar" estado
     Just (torre, reconstruirTorres) ->
-      let custo = custoUpgradeTorre torre
+      let registry = registoTorres estado
+          runtime = towerRuntimeDaTorre registry torre
           base = baseJogo jogoAtual
-       in if creditosBase base < custo
-          then adicionaMensagem MsgErro "Creditos insuficientes" estado
-          else
-            let torresAtualizadas = reconstruirTorres (upgradeTorre torre)
-                baseAtualizada = base {creditosBase = creditosBase base - custo}
-                efeitoNovo = EfeitoUpgradeUI (posicaoTorre torre) 0.65
-             in adicionaMensagem MsgSucesso "Torre melhorada" estado {jogo = jogoAtual {torresJogo = torresAtualizadas, baseJogo = baseAtualizada}, efeitosUpgrade = efeitoNovo : take 11 (efeitosUpgrade estado)}
+       in if precisaEspecializacao runtime
+            then adicionaMensagem MsgAviso "Escolhe POTENCIA ou CADENCIA" estado
+            else case (custoUpgradeRuntime runtime torre, upgradeTorreRuntime runtime torre) of
+              (Nothing, _) -> adicionaMensagem MsgAviso "Torre no nivel maximo" estado
+              (_, Nothing) -> adicionaMensagem MsgAviso "Torre no nivel maximo" estado
+              (Just custo, Just torreNova)
+                | creditosBase base < custo -> adicionaMensagem MsgErro "Creditos insuficientes" estado
+                | otherwise ->
+                    let spec = towerSpec (runtimeTowerId runtime)
+                        torresAtualizadas = reconstruirTorres torreNova
+                        baseAtualizada = base {creditosBase = creditosBase base - custo}
+                        registryComIdentidade = insertTowerRuntime (posicaoTorre torre) runtime registry
+                        registryAtualizado = upgradeTowerLevel (nivelMaximoTowerSpec spec) (posicaoTorre torre) registryComIdentidade
+                        efeitoNovo = EfeitoUpgradeUI (posicaoTorre torre) 0.65
+                     in adicionaMensagem MsgSucesso ("Torre melhorada para nivel " ++ show (min (nivelMaximoTowerSpec spec) (runtimeLevel runtime + 1))) estado {jogo = jogoAtual {torresJogo = torresAtualizadas, baseJogo = baseAtualizada}, registoTorres = registryAtualizado, efeitosUpgrade = efeitoNovo : take 11 (efeitosUpgrade estado)}
+
+especializaSelecionada :: TowerSpecialization -> ImmutableTowers -> ImmutableTowers
+especializaSelecionada specialization estado =
+  case torreFocada estado >>= procurarTorreAtualizavel (torresJogo (jogo estado)) of
+    Nothing -> adicionaMensagem MsgAviso "Seleciona uma torre para especializar" estado
+    Just (torre, reconstruirTorres) ->
+      let jogoAtual = jogo estado
+          registry = registoTorres estado
+          runtime = towerRuntimeDaTorre registry torre
+          base = baseJogo jogoAtual
+       in case (custoEspecializacao specialization runtime torre, upgradeComEspecializacao specialization runtime torre) of
+            (Just custo, Just torreNova)
+              | creditosBase base < custo -> adicionaMensagem MsgErro "Creditos insuficientes" estado
+              | otherwise ->
+                  let spec = towerSpec (runtimeTowerId runtime)
+                      baseAtualizada = base {creditosBase = creditosBase base - custo}
+                      registryComIdentidade = insertTowerRuntime (posicaoTorre torre) runtime registry
+                      registryEspecializado = specializeTower specialization (posicaoTorre torre) registryComIdentidade
+                      registryAtualizado = upgradeTowerLevel (nivelMaximoTowerSpec spec) (posicaoTorre torre) registryEspecializado
+                      efeitoNovo = EfeitoUpgradeUI (posicaoTorre torre) 0.9
+                   in adicionaMensagem MsgSucesso (nomeTorre (runtimeTowerId runtime) ++ ": " ++ nomeEspecializacao specialization) estado {jogo = jogoAtual {torresJogo = reconstruirTorres torreNova, baseJogo = baseAtualizada}, registoTorres = registryAtualizado, efeitosUpgrade = efeitoNovo : take 11 (efeitosUpgrade estado)}
+            _ -> adicionaMensagem MsgAviso "Especializacao indisponivel" estado
 
 colocaTorreSelecionada :: ImmutableTowers -> Jogo -> Torre -> (Float, Float) -> ImmutableTowers
 colocaTorreSelecionada estado jogoAtual torre (mx, my) =
@@ -359,10 +433,13 @@ colocaTorreSelecionada estado jogoAtual torre (mx, my) =
       posicaoLivre = notElem novaPosicao (map posicaoTorre (torresJogo jogoAtual))
    in if terrenoValido && posicaoLivre
       then
-        let precoTorre = maybe 0 fst (find (\(_, t) -> mesmoModeloTorre t torre) (lojaJogo jogoAtual))
+        let towerId = fromMaybe (towerIdSpec (towerSpecAproximada torre)) (torreSelecionadaId estado)
+            entradas = shopEntriesParaModo (modoJogoEscolhido estado) (progressoMeta estado)
+            precoTorre = maybe (precoTowerSpec (towerSpec towerId)) shopPrice (find ((== towerId) . shopTowerId) entradas)
             novaBase = (baseJogo jogoAtual) {creditosBase = creditosBase (baseJogo jogoAtual) - precoTorre}
             novasTorres = torre {posicaoTorre = novaPosicao} : torresJogo jogoAtual
-         in estado {jogo = jogoAtual {torresJogo = novasTorres, baseJogo = novaBase}, torreSelecionada = Nothing, torreFocada = Just novaPosicao, posicaoRato = Just (mx, my)}
+            registryAtualizado = registerTower towerId novaPosicao (registoTorres estado)
+         in estado {jogo = jogoAtual {torresJogo = novasTorres, baseJogo = novaBase}, torreSelecionada = Nothing, torreSelecionadaId = Nothing, torreFocada = Just novaPosicao, registoTorres = registryAtualizado, posicaoRato = Just (mx, my)}
           |> adicionaMensagem MsgSucesso "Torre construida"
       else adicionaMensagem MsgErro "Nao podes construir aqui" estado {posicaoRato = Just (mx, my)}
 
@@ -425,15 +502,16 @@ selecionarTorreLoja :: ImmutableTowers -> (Float, Float) -> Maybe ImmutableTower
 selecionarTorreLoja estado (mx, my)
   | not (lojaVisivel estado) = Nothing
   | otherwise =
-      case find (\(i, _) -> lojaClicada (length lojaAtual) mx my i) (zip [0 ..] lojaAtual) of
-        Just (_, (preco, torre))
-          | creditosBase (baseJogo (jogo estado)) >= preco ->
-              Just $ adicionaMensagem MsgInfo ("Selecionada " ++ nomeTipoProjetil (projetilTorre torre)) estado {torreSelecionada = Just torre, torreFocada = Nothing, posicaoRato = Just (mx, my)}
+      case find (\(i, _) -> lojaClicada (length entradas) mx my i) (zip [0 ..] entradas) of
+        Just (_, entrada)
+          | creditosBase (baseJogo (jogo estado)) >= shopPrice entrada ->
+              let towerId = shopTowerId entrada
+               in Just $ adicionaMensagem MsgInfo ("Selecionada " ++ nomeTorre towerId) estado {torreSelecionada = Just (shopTower entrada), torreSelecionadaId = Just towerId, torreFocada = Nothing, posicaoRato = Just (mx, my)}
           | otherwise ->
               Just $ adicionaMensagem MsgAviso "Creditos insuficientes" estado {posicaoRato = Just (mx, my)}
         Nothing -> Nothing
   where
-    lojaAtual = lojaJogo (jogo estado)
+    entradas = shopEntriesParaModo (modoJogoEscolhido estado) (progressoMeta estado)
 
 cliqueBloqueadoPelaUI :: ImmutableTowers -> (Float, Float) -> Bool
 cliqueBloqueadoPelaUI estado pos =
@@ -443,8 +521,8 @@ cliqueBloqueadoPelaUI estado pos =
       [ UIRect 0 (alturaJanela / 2 - 46) larguraJanela 92
       , UIRect 0 (-alturaJanela / 2 + 34) larguraJanela 68
       ]
-      ++ [UIRect (larguraJanela / 2 - 186) 8 300 476 | not (hudCompacto estado)]
-      ++ [shopPanelRect (length (lojaJogo (jogo estado))) | lojaVisivel estado]
+      ++ [gamePanelRect | not (hudCompacto estado)]
+      ++ [shopPanelRect (length (shopEntriesParaModo (modoJogoEscolhido estado) (progressoMeta estado))) | lojaVisivel estado]
 
 opcaoMenuClicada :: Float -> Float -> Maybe MenuInicialOpcoes
 opcaoMenuClicada mx my = fmap fst $ find (containsPoint (mx, my) . snd) botoes

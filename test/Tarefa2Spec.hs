@@ -48,23 +48,3 @@ testesTarefa2 =
         "terminouJogo (derrota)" ~: True ~=? terminouJogo jogo1 {baseJogo = base1 {vidaBase = 0}},
         "terminouJogo (vitoria)" ~: False ~=? terminouJogo jogo1           
       ]
-      
-
-instance Eq Inimigo where
-  (Inimigo {posicaoInimigo = p1, direcaoInimigo = d1, vidaInimigo = v1, velocidadeBaseInimigo = vb1, velocidadeInimigo = vel1, ataqueInimigo = a1, butimInimigo = b1, projeteisInimigo = proj1}) 
-    == (Inimigo {posicaoInimigo = p2, direcaoInimigo = d2, vidaInimigo = v2, velocidadeBaseInimigo = vb2, velocidadeInimigo = vel2, ataqueInimigo = a2, butimInimigo = b2, projeteisInimigo = proj2}) =
-    p1 == p2 && d1 == d2 && v1 == v2 && vb1 == vb2 && vel1 == vel2 && a1 == a2 && b1 == b2 && proj1 == proj2
-
-instance Eq Projetil where
-  (Projetil {tipoProjetil = t1, duracaoProjetil = d1}) 
-    == (Projetil {tipoProjetil = t2, duracaoProjetil = d2}) =
-    t1 == t2 && d1 == d2
-
-instance Eq Portal where
-  (Portal {posicaoPortal = p1, ondasPortal = o1}) 
-    == (Portal {posicaoPortal = p2, ondasPortal = o2}) =
-    p1 == p2 && o1 == o2
-
-instance Eq Onda where
-  (Onda inimigos1 ciclo1 tempo1 entrada1) == (Onda inimigos2 ciclo2 tempo2 entrada2) =
-    inimigos1 == inimigos2 && ciclo1 == ciclo2 && tempo1 == tempo2 && entrada1 == entrada2
